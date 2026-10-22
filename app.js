@@ -54,6 +54,19 @@ const MEALS = [
   { id: 'd', name: 'Abendessen', icon: 'moon', g: ['#7d7bff', '#4b49d1'] },
   { id: 's', name: 'Snacks', icon: 'cookie', g: ['#e0a96d', '#b5763a'] },
 ];
+/* Eingebaute Lebensmittel (foods.js) */
+const norm = s => String(s || '').toLowerCase().replace(/ä/g, 'a').replace(/ö/g, 'o').replace(/ü/g, 'u').replace(/ß/g, 'ss');
+const slug = s => norm(s).replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+const BASE = {};
+for (const [cat, rows] of Object.entries(typeof FOOD_LIST !== 'undefined' ? FOOD_LIST : {})) {
+  for (const [name, kcal, c, p, f, pg, pl] of rows) {
+    const id = 'base:' + slug(name);
+    BASE[id] = { id, src: 'base', cat, name, brand: '', kcal, c, p, f, portion: pg ? { g: pg, label: `${pl} (${n0(pg)} g)` } : null };
+  }
+}
+const getFood = id => S.foods[id] || BASE[id];
+const POPULAR = ['Ei', 'Banane', 'Haferflocken', 'Skyr natur', 'Magerquark', 'Hähnchenbrust roh', 'Reis gekocht', 'Nudeln gekocht', 'Vollkornbrot', 'Apfel', 'Milch 1,5 %', 'Kartoffeln gekocht'].map(n => 'base:' + slug(n));
+
 const mealOf = id => MEALS.find(m => m.id === id) || MEALS[3];
 const tile = (ic, g) => `<span class="ic" style="background:linear-gradient(180deg,${g[0]},${g[1]})">${icon(ic)}</span>`;
 function mealByTime() { const h = new Date().getHours(); return h < 11 ? 'b' : h < 15 ? 'l' : h < 18 ? 's' : h < 22 ? 'd' : 's'; }
@@ -224,7 +237,7 @@ function viewGoals() {
     <button class="it" data-act="healthHelp">${tile('heart', ['#ff5c7c', '#e8264d'])}<div class="n"><b>Apple Health verbinden</b><span>Verbrannte Kalorien per Kurzbefehl</span></div><span class="chev">${icon('right')}</span></button>
     <button class="it" data-act="ownFoods">${tile('pencil', ['#a1a1a6', '#6e6e73'])}<div class="n"><b>Eigene Lebensmittel</b><span>${Object.values(S.foods).length} gespeichert</span></div><span class="chev">${icon('right')}</span></button>
   </section>
-  <p class="foot">Alle Daten bleiben auf diesem Gerät. Es gibt kein Konto und keine Werbung. Lebensmitteldaten kommen von Open Food Facts (offene Datenbank, ODbL).</p>
+  <p class="foot">Alle Daten bleiben auf diesem Gerät. Es gibt kein Konto und keine Werbung. Eingebaute Lebensmittel sind Richtwerte. Die Online-Suche und der Barcode-Scan nutzen Open Food Facts (offene Datenbank, ODbL).</p>
   <section class="list"><button class="it danger" data-act="wipe">Alle Daten löschen</button></section>`;
 }
 
@@ -286,17 +299,20 @@ function openAdd(meal) {
 function renderAddHead() {
   const t = $('#addTitle'); if (!t) return;
   t.innerHTML = `${esc(mealOf(addCtx.meal).name)} <span style="color:var(--l2);font-size:13px">▾</span>`;
-  $('#addSeg').innerHTML = [['recent', 'Zuletzt'], ['fav', 'Favoriten'], ['own', 'Eigene']].map(([id, l]) => `<button class="${addCtx.filter === id ? 'on' : ''}" data-act="addFilter" data-f="${id}">${l}</button>`).join('');
+  $('#addSeg').innerHTML = [['recent', 'Zuletzt'], ['list', 'Liste'], ['fav', 'Favoriten'], ['own', 'Eigene']].map(([id, l]) => `<button class="${addCtx.filter === id ? 'on' : ''}" data-act="addFilter" data-f="${id}">${l}</button>`).join('');
 }
-const foodRow = (f, extra = '') => `<button class="it" data-act="pickFood" data-id="${esc(f.id)}"${extra}><div class="n"><b>${esc(f.name)}</b><span>${f.brand ? esc(f.brand) + ' · ' : ''}${n0(f.kcal)} kcal pro 100 g</span></div><span class="plus">${icon('plus')}</span></button>`;
+const foodRow = (f, extra = '') => `<button class="it" data-act="pickFood" data-id="${esc(f.id)}"${extra}><div class="n"><b>${esc(f.name)}</b><span>${f.brand ? esc(f.brand) + ' · ' : ''}${f.portion ? `${esc(f.portion.label)} · ${n0(f.kcal * f.portion.g / 100)} kcal` : `${n0(f.kcal)} kcal pro 100 g`}</span></div><span class="plus">${icon('plus')}</span></button>`;
 function renderAddBody() {
   const body = $('#addBody'); if (!body) return;
   const foods = Object.values(S.foods);
   let html = '';
   if (addCtx.q) {
-    const q = addCtx.q.toLowerCase();
-    const loc = foods.filter(f => (f.name + ' ' + (f.brand || '')).toLowerCase().includes(q)).sort((a, b) => (b.used || 0) - (a.used || 0)).slice(0, 30);
-    if (loc.length) html += `<div class="hdr"><span>Gespeichert</span></div><section class="list">${loc.map(f => foodRow(f)).join('')}</section>`;
+    const words = norm(addCtx.q).split(/\s+/).filter(Boolean);
+    const pool = [...foods, ...Object.values(BASE).filter(b => !S.foods[b.id])];
+    const starts = f => norm(f.name).startsWith(words[0]) ? 0 : 1;
+    const loc = pool.filter(f => { const h = norm(f.name + ' ' + (f.brand || '')); return words.every(w => h.includes(w)); })
+      .sort((a, b) => (b.used || 0) - (a.used || 0) || starts(a) - starts(b) || a.name.length - b.name.length).slice(0, 30);
+    if (loc.length) html += `<div class="hdr"><span>Lebensmittel</span></div><section class="list">${loc.map(f => foodRow(f)).join('')}</section>`;
     html += `<div class="hdr"><span>Open Food Facts</span></div>`;
     if (addCtx.loading) html += `<section class="list"><div class="empty"><div class="spin"></div></div></section>`;
     else if (addCtx.online === null) html += `<section class="list"><button class="it action" data-act="searchOnline">${icon('globe')}Online nach „${esc(addCtx.q)}“ suchen</button></section>`;
@@ -305,11 +321,21 @@ function renderAddBody() {
     else html += `<section class="list">${addCtx.online.items.map((f, i) => `<button class="it" data-act="pickOnline" data-i="${i}"><div class="n"><b>${esc(f.name)}</b><span>${f.brand ? esc(f.brand) + ' · ' : ''}${n0(f.kcal)} kcal pro 100 g</span></div><span class="plus">${icon('plus')}</span></button>`).join('')}</section>`;
   } else {
     let list;
+    if (addCtx.filter === 'list') {
+      const cats = {};
+      for (const b of Object.values(BASE)) (cats[b.cat] ||= []).push(getFood(b.id));
+      body.innerHTML = Object.entries(cats).map(([c, fs]) => `<div class="hdr"><span>${esc(c)}</span></div><section class="list">${fs.map(f => foodRow(f)).join('')}</section>`).join('') +
+        `<p class="foot">Die eingebauten Werte sind Richtwerte pro 100 g. Für genaue Werte einer Marke den Barcode scannen.</p>`;
+      return;
+    }
     if (addCtx.filter === 'fav') list = foods.filter(f => f.fav).sort((a, b) => a.name.localeCompare(b.name, 'de'));
     else if (addCtx.filter === 'own') list = foods.filter(f => f.src === 'own').sort((a, b) => a.name.localeCompare(b.name, 'de'));
     else list = foods.filter(f => f.last).sort((a, b) => b.last - a.last).slice(0, 40);
-    const empty = { recent: 'Hier erscheinen Lebensmittel, die du schon einmal eingetragen hast. Such oben nach einem Lebensmittel oder scanne einen Barcode.', fav: 'Noch keine Favoriten. Tippe beim Eintragen auf den Stern, um ein Lebensmittel hier abzulegen.', own: 'Noch keine eigenen Lebensmittel. Leg eins an, wenn du es online nicht findest.' }[addCtx.filter];
-    html += list.length ? `<section class="list">${list.map(f => foodRow(f)).join('')}</section>` : `<p class="empty">${empty}</p>`;
+    const empty = { recent: '', fav: 'Noch keine Favoriten. Tippe beim Eintragen auf den Stern, um ein Lebensmittel hier abzulegen.', own: 'Noch keine eigenen Lebensmittel. Leg eins an, wenn du es online nicht findest.' }[addCtx.filter];
+    if (!list.length && addCtx.filter === 'recent') {
+      html += `<div class="hdr"><span>Beliebt</span></div><section class="list">${POPULAR.map(getFood).filter(Boolean).map(f => foodRow(f)).join('')}</section>
+        <p class="foot">Über ${Object.keys(BASE).length} Lebensmittel sind schon eingebaut, siehe „Liste“. Alles andere findest du über die Suche oder den Barcode.</p>`;
+    } else html += list.length ? `<section class="list">${list.map(f => foodRow(f)).join('')}</section>` : `<p class="empty">${empty}</p>`;
   }
   html += `<section class="list icons">
     <button class="it" data-act="newFood">${tile('pencil', ['#a1a1a6', '#6e6e73'])}<div class="n"><b>Eigenes Lebensmittel anlegen</b><span>Werte von der Packung abtippen</span></div><span class="chev">${icon('right')}</span></button>
@@ -755,11 +781,11 @@ const ACT = {
   setMeal: b => { addCtx.meal = b.dataset.meal; closeTop(); renderAddHead(); },
   addFilter: b => { addCtx.filter = b.dataset.f; renderAddHead(); renderAddBody(); },
   searchOnline: () => searchOnline(),
-  pickFood: b => { const f = S.foods[b.dataset.id]; if (f) openAmount(f); },
+  pickFood: b => { const f = getFood(b.dataset.id); if (f) openAmount(f); },
   pickOnline: b => { const f = addCtx.online.items[+b.dataset.i]; if (f) openAmount(S.foods[f.id] ? { ...S.foods[f.id], ...f, fav: S.foods[f.id].fav, lastG: S.foods[f.id].lastG } : f); },
   fav: b => {
     const id = b.dataset.id; let f = S.foods[id];
-    if (!f) { const on = addCtx?.online?.items.find(x => x.id === id); if (!on) return; f = rememberFood(on); }
+    if (!f) { const on = BASE[id] || addCtx?.online?.items.find(x => x.id === id); if (!on) return; f = rememberFood(on); }
     f.fav = !f.fav; save(); b.innerHTML = icon(f.fav ? 'starF' : 'star'); toast(f.fav ? 'Zu Favoriten hinzugefügt' : 'Aus Favoriten entfernt'); renderAddBody();
   },
   scan: () => openScanner(),
