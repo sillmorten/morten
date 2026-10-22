@@ -24,7 +24,7 @@ const dayTitle = k => { const t = todayKey(); if (k === t) return 'Heute'; if (k
 
 /* ---------- Daten ---------- */
 const KEY = 'kalorien.v1';
-const DEFAULTS = () => ({ v: 1, setup: false, goals: { kcal: 2500, c: 280, p: 150, f: 80 }, weightKg: 80, days: {}, foods: {}, weights: [], lastBackup: null });
+const DEFAULTS = () => ({ v: 1, setup: false, name: 'Luka', greeted: false, goals: { kcal: 2500, c: 280, p: 150, f: 80 }, weightKg: 80, days: {}, foods: {}, weights: [], lastBackup: null });
 let S = load();
 function load() {
   try {
@@ -140,6 +140,7 @@ function viewToday() {
     </div>
   </header>
   <h1 class="lt"><small>${longDate(cur)}</small>${dayTitle(cur)}</h1>
+  ${isToday && S.name ? `<p class="greet">${greeting()}</p>` : ''}
   <section class="card hero">
     <div class="ringwrap">${ring(over ? 1 : (avail ? t.kcal / avail : 0), over ? 'var(--org)' : 'var(--tint)', { size: 140, stroke: 18 })}
       <div class="ringlabel"><b class="num">${n0(Math.abs(left))}</b><span>${over ? 'kcal zu viel' : 'kcal übrig'}</span></div></div>
@@ -158,6 +159,15 @@ function viewToday() {
     <div class="it tap" data-act="sport" role="button">${tile('barbell', ['#ff5c7c', '#e8264d'])}<div class="n"><b>Sport</b><span>${sportSub}</span></div>
       ${t.burned ? `<span class="k good num">−${n0(t.burned)}</span>` : ''}<span class="${t.burned ? 'chev' : 'plus'}">${icon(t.burned ? 'right' : 'plus')}</span></div>
   </section>`;
+}
+
+function greeting() {
+  const h = new Date().getHours(), n = esc(S.name);
+  if (h < 5) return `Noch wach, ${n}? 🌙`;
+  if (h < 11) return `Guten Morgen, ${n} ☀️`;
+  if (h < 17) return `Hey ${n}, läuft bei dir 💪`;
+  if (h < 22) return `Guten Abend, ${n} 👋`;
+  return `Gute Nacht, ${n} 😴`;
 }
 
 /* ---------- Verlauf ---------- */
@@ -231,6 +241,8 @@ function viewGoals() {
   <p class="foot" id="macrohint">Deine Makros ergeben zusammen ${n0(macroKcal)} kcal.${Math.abs(macroKcal - g.kcal) > 50 ? ` <button data-act="kcalFromMacros" style="color:var(--tint);font-weight:600">Als Kalorienziel übernehmen</button>` : ''}</p>
   <div class="hdr"><span>Für die Sport-Berechnung</span></div>
   <section class="list">${inp('weightKg', 'Körpergewicht', n1(S.weightKg), 'kg')}</section>
+  <div class="hdr"><span>Profil</span></div>
+  <section class="list"><div class="row-in"><label for="name">Dein Name</label><input id="name" class="wide" value="${esc(S.name)}" data-goal="name" autocapitalize="words" placeholder="Name"><span class="u"></span></div></section>
   <div class="hdr"><span>Daten</span></div>
   <section class="list icons">
     <button class="it" data-act="backup">${tile('cloud', ['#40a0ff', '#0a6fe0'])}<div class="n"><b>Backup erstellen oder laden</b><span>Sicherungsdatei, z. B. in iCloud Drive</span></div><span class="chev">${icon('right')}</span></button>
@@ -746,23 +758,45 @@ function importBackup(file) {
 
 /* ---------- Ersteinrichtung ---------- */
 function openWelcome() {
-  openLayer('sheet', `
-    <div class="sh"><div class="t"><b>Willkommen</b><span>Stell kurz deine Tagesziele ein</span></div></div>
-    <p class="note" style="text-align:left">Alles bleibt auf diesem iPhone. Du kannst die Ziele später jederzeit unter <b>Ziele</b> ändern.</p>
+  const n = esc(S.name || 'du');
+  const hero = `<div class="hello">
+      <img src="icons/icon-192.png" alt="" class="hello-ic">
+      <h2>Hey ${n}! 🎉</h2>
+      <p>Viel Spaß mit deiner eigenen App! Kein Abo, keine Werbung, kein Schnickschnack. Nur du, dein Essen und deine Ziele.</p>
+    </div>`;
+  const goals = S.setup ? '' : `
+    <p class="note" style="text-align:left">Stell kurz deine Tagesziele ein. Alles bleibt auf deinem iPhone, und du kannst es später unter <b>Ziele</b> ändern.</p>
     <section class="list">
       <div class="row-in"><label for="w_kcal">Kalorien</label><input id="w_kcal" inputmode="decimal" value="${S.goals.kcal}"><span class="u">kcal</span></div>
       <div class="row-in"><label for="w_c">Kohlenhydrate</label><input id="w_c" inputmode="decimal" value="${S.goals.c}"><span class="u">g</span></div>
       <div class="row-in"><label for="w_p">Eiweiß</label><input id="w_p" inputmode="decimal" value="${S.goals.p}"><span class="u">g</span></div>
       <div class="row-in"><label for="w_f">Fett</label><input id="w_f" inputmode="decimal" value="${S.goals.f}"><span class="u">g</span></div>
       <div class="row-in"><label for="w_kg">Körpergewicht</label><input id="w_kg" inputmode="decimal" value="${n1(S.weightKg)}"><span class="u">kg</span></div>
-    </section>
-    <button class="btn" id="wcOk">Los geht’s</button>`, el => {
+    </section>`;
+  openLayer('sheet', `${hero}${goals}<button class="btn" id="wcOk">Los geht’s${S.name ? ', ' + n : ''}!</button>`, el => {
+    confetti();
     $('#wcOk', el).addEventListener('click', () => {
-      for (const k of ['kcal', 'c', 'p', 'f']) { const v = num($('#w_' + k, el).value); if (v > 0) S.goals[k] = Math.round(v); }
-      const kg = num($('#w_kg', el).value); if (kg > 20 && kg < 400) S.weightKg = kg;
-      S.setup = true; save(); closeTop(); render();
+      if (!S.setup) {
+        for (const k of ['kcal', 'c', 'p', 'f']) { const v = num($('#w_' + k, el).value); if (v > 0) S.goals[k] = Math.round(v); }
+        const kg = num($('#w_kg', el).value); if (kg > 20 && kg < 400) S.weightKg = kg;
+      }
+      S.setup = true; S.greeted = true; save(); closeTop(); render();
     });
   });
+}
+function confetti() {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const c = document.createElement('canvas'), x = c.getContext('2d'), dpr = devicePixelRatio || 1;
+  c.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:90';
+  c.width = innerWidth * dpr; c.height = innerHeight * dpr; x.scale(dpr, dpr); document.body.appendChild(c);
+  const cols = ['#ff375f', '#30d158', '#ff9f0a', '#0a84ff', '#ffd60a', '#bf5af2'];
+  const ps = Array.from({ length: 140 }, () => ({ x: innerWidth / 2 + (Math.random() - .5) * 80, y: innerHeight * .35, vx: (Math.random() - .5) * 13, vy: -Math.random() * 13 - 4, r: Math.random() * Math.PI, vr: (Math.random() - .5) * .3, w: 6 + Math.random() * 6, h: 8 + Math.random() * 8, c: cols[Math.floor(Math.random() * cols.length)] }));
+  const t0 = performance.now();
+  (function frame(t) {
+    x.clearRect(0, 0, innerWidth, innerHeight);
+    for (const p of ps) { p.vy += .32; p.vx *= .99; p.x += p.vx; p.y += p.vy; p.r += p.vr; x.save(); x.translate(p.x, p.y); x.rotate(p.r); x.fillStyle = p.c; x.fillRect(-p.w / 2, -p.h / 2, p.w, p.h * Math.abs(Math.cos(p.r * 2))); x.restore(); }
+    if (t - t0 < 3500) requestAnimationFrame(frame); else c.remove();
+  })(t0);
 }
 
 /* ---------- Aktionen ---------- */
@@ -832,6 +866,7 @@ function fitAmt(i) { if (i.id === 'bc') return; const len = Math.max((i.value ||
 document.addEventListener('input', ev => {
   if (ev.target.matches && ev.target.matches('.amt input')) fitAmt(ev.target);
   const id = ev.target.dataset && ev.target.dataset.goal; if (!id) return;
+  if (id === 'name') { S.name = ev.target.value.trim(); save(); return; }
   const v = num(ev.target.value);
   if (id === 'weightKg') { if (v > 20 && v < 400) S.weightKg = v; }
   else if (v > 0) S.goals[id] = Math.round(v);
@@ -865,7 +900,7 @@ document.addEventListener('visibilitychange', () => {
 
 /* ---------- Start ---------- */
 render();
-if (!S.setup) openWelcome();
+if (!S.setup || !S.greeted) openWelcome();
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 if ('serviceWorker' in navigator && location.protocol === 'https:') {
   // Neue Version: Seite einmal neu laden, sobald der neue Service Worker übernimmt
