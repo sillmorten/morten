@@ -773,14 +773,17 @@ function openWelcome() {
       <div class="row-in"><label for="w_f">Fett</label><input id="w_f" inputmode="decimal" value="${S.goals.f}"><span class="u">g</span></div>
       <div class="row-in"><label for="w_kg">Körpergewicht</label><input id="w_kg" inputmode="decimal" value="${n1(S.weightKg)}"><span class="u">kg</span></div>
     </section>`;
+  const firstSetup = !S.setup;
+  // Nur ein einziges Mal zeigen, auch wenn das Fenster weggewischt wird
+  S.greeted = true; S.setup = true; save();
   openLayer('sheet', `${hero}${goals}<button class="btn" id="wcOk">Los geht’s${S.name ? ', ' + n : ''}!</button>`, el => {
     confetti();
     $('#wcOk', el).addEventListener('click', () => {
-      if (!S.setup) {
+      if (firstSetup) {
         for (const k of ['kcal', 'c', 'p', 'f']) { const v = num($('#w_' + k, el).value); if (v > 0) S.goals[k] = Math.round(v); }
         const kg = num($('#w_kg', el).value); if (kg > 20 && kg < 400) S.weightKg = kg;
       }
-      S.setup = true; S.greeted = true; save(); closeTop(); render();
+      save(); closeTop(); render();
     });
   });
 }
