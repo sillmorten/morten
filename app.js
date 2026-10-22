@@ -24,7 +24,7 @@ const dayTitle = k => { const t = todayKey(); if (k === t) return 'Heute'; if (k
 
 /* ---------- Daten ---------- */
 const KEY = 'kalorien.v1';
-const DEFAULTS = () => ({ v: 1, setup: false, name: 'Luka', greeted: false, goals: { kcal: 2500, c: 280, p: 150, f: 80 }, weightKg: 80, days: {}, foods: {}, weights: [], lastBackup: null });
+const DEFAULTS = () => ({ v: 1, setup: false, name: '', greeted: false, goals: { kcal: 2500, c: 280, p: 150, f: 80 }, weightKg: 80, days: {}, foods: {}, weights: [], lastBackup: null });
 let S = load();
 function load() {
   try {
@@ -758,13 +758,8 @@ function importBackup(file) {
 
 /* ---------- Ersteinrichtung ---------- */
 function openWelcome() {
-  const n = esc(S.name || 'du');
-  const hero = `<div class="hello">
-      <img src="icons/icon-192.png" alt="" class="hello-ic">
-      <h2>Hey ${n}! 🎉</h2>
-      <p>Viel Spaß mit deiner eigenen App! Kein Abo, keine Werbung, kein Schnickschnack. Nur du, dein Essen und deine Ziele.</p>
-    </div>`;
-  const goals = S.setup ? '' : `
+  const firstSetup = !S.setup;
+  const goals = !firstSetup ? '' : `
     <p class="note" style="text-align:left">Stell kurz deine Tagesziele ein. Alles bleibt auf deinem iPhone, und du kannst es später unter <b>Ziele</b> ändern.</p>
     <section class="list">
       <div class="row-in"><label for="w_kcal">Kalorien</label><input id="w_kcal" inputmode="decimal" value="${S.goals.kcal}"><span class="u">kcal</span></div>
@@ -773,18 +768,42 @@ function openWelcome() {
       <div class="row-in"><label for="w_f">Fett</label><input id="w_f" inputmode="decimal" value="${S.goals.f}"><span class="u">g</span></div>
       <div class="row-in"><label for="w_kg">Körpergewicht</label><input id="w_kg" inputmode="decimal" value="${n1(S.weightKg)}"><span class="u">kg</span></div>
     </section>`;
-  const firstSetup = !S.setup;
   // Nur ein einziges Mal zeigen, auch wenn das Fenster weggewischt wird
   S.greeted = true; S.setup = true; save();
-  openLayer('sheet', `${hero}${goals}<button class="btn" id="wcOk">Los geht’s${S.name ? ', ' + n : ''}!</button>`, el => {
-    confetti();
-    $('#wcOk', el).addEventListener('click', () => {
-      if (firstSetup) {
-        for (const k of ['kcal', 'c', 'p', 'f']) { const v = num($('#w_' + k, el).value); if (v > 0) S.goals[k] = Math.round(v); }
-        const kg = num($('#w_kg', el).value); if (kg > 20 && kg < 400) S.weightKg = kg;
-      }
-      save(); closeTop(); render();
-    });
+  openLayer('sheet', `<div id="wcBody" style="display:flex;flex-direction:column;gap:14px"></div>`, el => {
+    const body = $('#wcBody', el);
+    const greet = () => {
+      const n = esc(S.name);
+      body.innerHTML = `<div class="hello">
+          <img src="icons/icon-192.png" alt="" class="hello-ic">
+          <h2>Hey ${n || 'du'}! 🎉</h2>
+          <p>Viel Spaß mit deiner eigenen App! Kein Abo, keine Werbung, kein Schnickschnack. Nur du, dein Essen und deine Ziele.</p>
+        </div>${goals}<button class="btn" id="wcOk">Los geht’s${n ? ', ' + n : ''}!</button>`;
+      confetti();
+      $('#wcOk', el).addEventListener('click', () => {
+        if (firstSetup) {
+          for (const k of ['kcal', 'c', 'p', 'f']) { const v = num($('#w_' + k, el).value); if (v > 0) S.goals[k] = Math.round(v); }
+          const kg = num($('#w_kg', el).value); if (kg > 20 && kg < 400) S.weightKg = kg;
+        }
+        save(); closeTop(); render();
+      });
+    };
+    if (S.name) { greet(); return; }
+    body.innerHTML = `<div class="hello">
+        <img src="icons/icon-192.png" alt="" class="hello-ic">
+        <h2>Willkommen! 👋</h2>
+        <p>Schön, dass du da bist. Wie heißt du?</p>
+      </div>
+      <section class="list"><div class="row-in"><input id="wcName" class="wide" style="text-align:left" placeholder="Dein Vorname" autocapitalize="words" autocomplete="given-name" enterkeyhint="next" aria-label="Dein Vorname"></div></section>
+      <button class="btn" id="wcNext">Weiter</button>`;
+    const inp = $('#wcName', el);
+    const next = () => {
+      const name = inp.value.trim().slice(0, 30);
+      if (!name) { toast('Wie heißt du?'); inp.focus(); return; }
+      S.name = name; save(); render(); greet();
+    };
+    $('#wcNext', el).addEventListener('click', next);
+    inp.addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); next(); } });
   });
 }
 function confetti() {
