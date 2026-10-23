@@ -324,4 +324,19 @@ i.o { background: var(--org); }
 @keyframes lkDrop { from { opacity: 0; transform: translateY(-30px) scale(.4); } }
 @keyframes lkShake { 0%, 30%, 100% { transform: rotate(0); } 5% { transform: rotate(-16deg); } 10% { transform: rotate(14deg); } 15% { transform: rotate(-10deg); } 20% { transform: rotate(6deg); } 25% { transform: rotate(-3deg); } }
 @keyframes lkUp { from { opacity: 0; transform: translateY(14px); } }
-@media (prefers-reduced-motion: reduce) { #lock, #lock * { animation: none !important; } }
+#lock { overflow: hidden; }
+#lock .hello { position: relative; z-index: 1; }
+.lk-float { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+.lk-float span { position: absolute; bottom: -60px; opacity: .4; animation: lkRise linear infinite; }
+@keyframes lkRise { to { transform: translateY(calc(-100vh - 120px)) rotate(40deg); } }
+.lk-badge { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+#lockIc { cursor: pointer; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+#lockIc.lk-rep { animation: lkRep .28s cubic-bezier(.34,1.56,.64,1); }
+@keyframes lkRep { 40% { transform: scale(.86) translateY(6px); } 70% { transform: scale(1.08) translateY(-10px); } }
+.lk-plus { position: absolute; top: -6px; font-weight: 800; font-size: 20px; color: var(--tint); pointer-events: none; animation: lkPlus .7s ease-out forwards; }
+@keyframes lkPlus { to { opacity: 0; transform: translateY(-46px); } }
+.lk-game { margin-top: 18px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.lk-game b { font-size: 40px; font-weight: 800; line-height: 1; color: var(--tint); font-variant-numeric: tabular-nums; }
+.lk-game span { font-size: 13px; color: var(--l2); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
+.lk-game small { font-size: 14px; color: var(--l2); margin-top: 6px; }
+@media (prefers-reduced-motion: reduce) { #lock, #lock * { animation: none !important; } .lk-float { display: none; } }

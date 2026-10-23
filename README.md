@@ -31,7 +31,7 @@ Icons: [Phosphor Icons](https://phosphoricons.com) (MIT). Barcode: [ZXing](https
 ## App sperren
 In `status.json` steuert `"gesperrt": true` einen Sperr-Bildschirm für alle Nutzer, `false` gibt die App wieder frei.
 Titel und Text lassen sich dort ebenfalls ändern. Die Daten auf den Geräten bleiben unberührt.
-Auf dem eigenen Gerät hebt 7× Tippen aufs Icon im Sperr-Bildschirm die Sperre dauerhaft auf.
+Auf dem eigenen Gerät hebt 7× Tippen aufs Schloss im Sperr-Bildschirm die Sperre dauerhaft auf. Tippen aufs Icon ist ein kleines Hantel-Minispiel.
 
 ## Punkte fürs Werben
 7× auf die Versionsnummer unten in „Ziele“ tippen schaltet den Besitzer-Modus an (und wieder aus).
