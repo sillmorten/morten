@@ -725,7 +725,7 @@ function openBackup() {
   });
 }
 async function exportBackup() {
-  const name = `kalorien-backup-${todayKey()}.json`;
+  const name = `biss-backup-${todayKey()}.json`;
   const blob = new Blob([JSON.stringify({ app: 'kalorien', exported: new Date().toISOString(), data: S })], { type: 'application/json' });
   const file = new File([blob], name, { type: 'application/json' });
   try {

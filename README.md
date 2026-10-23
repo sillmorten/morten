@@ -1,4 +1,4 @@
-# Kalorien
+# Biss
 
 Kalorien- und Makro-Tracker fürs iPhone, ohne Abo, ohne Konto, ohne Werbung.
 Alle Daten bleiben lokal auf dem Gerät (localStorage). Lebensmittel kommen von
