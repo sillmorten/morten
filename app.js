@@ -29,7 +29,7 @@ const DONATE_URL = 'https://paypal.me/MortenUkena';
 // Verbesserungswünsche gehen über Formspree direkt an den Entwickler. Leer lassen, um den Eintrag auszublenden.
 const WISH_URL = 'https://formspree.io/f/xeepbyjn';
 // Versionsnummer für die Anzeige in der App. Bei jedem Update zusammen mit VERSION in sw.js hochzählen.
-const APP_VERSION = '1.4.1';
+const APP_VERSION = '1.5.0';
 const KEY = 'kalorien.v1';
 const DEFAULTS = () => ({
   v: 1, setup: false, name: '', greeted: false, goals: { kcal: 2500, c: 280, p: 150, f: 80 }, weightKg: 80, days: {}, foods: {}, weights: [], lastBackup: null,
@@ -385,7 +385,8 @@ function viewGoals() {
     <button class="it" data-act="ownFoods">${tile('pencil', ['#a1a1a6', '#6e6e73'])}<div class="n"><b>Eigene Lebensmittel</b><span>${Object.values(S.foods).length} gespeichert</span></div><span class="chev">${icon('right')}</span></button>
   </section>
   <div class="hdr"><span>Teilen</span></div>
-  <section class="list icons"><button class="it" data-act="shareApp">${tile('share', ['#ff6b8a', '#e3123f'])}<div class="n"><b>App teilen</b><span>QR-Code zum Scannen zeigen</span></div><span class="chev">${icon('right')}</span></button></section>
+  <section class="list icons"><button class="it" data-act="shareApp">${tile('share', ['#ff6b8a', '#e3123f'])}<div class="n"><b>App teilen</b><span>QR-Code zeigen, Punkte sammeln</span></div><span class="chev">${icon('right')}</span></button>
+    ${WISH_URL ? (S.referredBy ? `<div class="it">${tile('trophy', ['#ffd60a', '#f5a300'])}<div class="n"><b>Geworben von</b><span>${esc(S.referredBy)}</span></div></div>` : `<button class="it" data-act="referral">${tile('trophy', ['#ffd60a', '#f5a300'])}<div class="n"><b>Wer hat dich geworben?</b><span>Die Person bekommt dafür Punkte</span></div><span class="chev">${icon('right')}</span></button>`) : ''}</section>
   ${WISH_URL ? `<div class="hdr"><span>Feedback</span></div>
   <section class="list icons"><button class="it" data-act="wish">${tile('sparkle', ['#ffd60a', '#f5a300'])}<div class="n"><b>Wunsch senden 💡</b><span>Was fehlt dir? Sag’s dem Entwickler</span></div><span class="chev">${icon('right')}</span></button></section>` : ''}
   ${DONATE_URL ? `<div class="hdr"><span>Unterstützen</span></div>
@@ -801,6 +802,7 @@ function openShare() {
       <li>Link in <b>Safari</b> öffnen.</li>
       <li><b>Teilen</b> → <b>Zum Home-Bildschirm</b>.</li>
     </ol></section>
+    ${WISH_URL ? `<p class="note">🏆 Punkte sammeln: Sag deinen Freunden, dass sie beim ersten Start <b>${esc(S.name || 'deinen Namen')}</b> als Empfehlung eintragen.</p>` : ''}
     <button class="btn" data-act="shareLink">Link senden</button>`);
 }
 async function shareLink() {
@@ -1157,6 +1159,50 @@ function openWish() {
   });
 }
 
+/* ---------- Empfehlungen ---------- */
+// Meldet einmalig per Formspree, wer diese Person geworben hat. Klappt es nicht, wird es beim nächsten Start nachgeholt.
+async function sendReferral() {
+  if (!WISH_URL || !S.referredBy || S.refSent || !navigator.onLine) return false;
+  try {
+    const r = await fetch(WISH_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ name: S.name || 'Ohne Namen', geworben_von: S.referredBy, message: `${S.name || 'Jemand'} wurde von ${S.referredBy} geworben.`, version: APP_VERSION, _subject: `Biss – Empfehlung: ${S.referredBy} hat ${S.name || 'jemanden'} geworben` }),
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    S.refSent = true; save(); return true;
+  } catch (e) { return false; }
+}
+function openReferral() {
+  openLayer('sheet', `<div id="refBody" style="display:flex;flex-direction:column;gap:14px"></div>`, el => {
+    const body = $('#refBody', el);
+    body.innerHTML = `
+      <div class="sh"><div class="t"><b>Wer hat dich geworben?</b><span>Die Person bekommt dafür Punkte</span></div><button class="xb" data-act="close" aria-label="Schließen">${icon('x')}</button></div>
+      <section class="list"><div class="row-in"><input id="refName" class="wide" style="text-align:left" placeholder="Name" autocapitalize="words" enterkeyhint="send" aria-label="Name"></div></section>
+      <button class="btn" id="refOk">Absenden</button>
+      <p class="note">Mitgeschickt werden nur dein Name${S.name ? ` (${esc(S.name)})` : ''} und der Name, den du einträgst. Das geht nur einmal.</p>`;
+    const inp = $('#refName', el), ok = $('#refOk', el);
+    setTimeout(() => inp.focus(), 350);
+    const send = async () => {
+      const ref = inp.value.trim().slice(0, 40);
+      if (!ref) { toast('Wer hat dir Biss empfohlen?'); inp.focus(); return; }
+      if (!navigator.onLine) { toast('Kein Internet. Versuch es später nochmal.'); return; }
+      ok.disabled = true; ok.textContent = 'Wird gesendet …';
+      S.referredBy = ref; S.refSent = false; save();
+      if (await sendReferral()) {
+        buzz(); render();
+        body.innerHTML = `<div class="hello"><div style="font-size:56px;line-height:1.1">🤝</div><h2>Danke!</h2><p>${esc(ref)} bekommt Punkte dafür, dass Biss bei dir gelandet ist.</p></div><button class="btn" data-act="close">Fertig</button>`;
+      } else {
+        delete S.referredBy; save();
+        ok.disabled = false; ok.textContent = 'Nochmal versuchen';
+        toast('Senden hat nicht geklappt. Versuch es gleich nochmal.');
+      }
+    };
+    ok.addEventListener('click', send);
+    inp.addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); send(); } });
+  });
+}
+
 /* ---------- Backup ---------- */
 let bkPhotos = null;
 function openBackup() {
@@ -1347,15 +1393,23 @@ function openWelcome() {
         <p>Schön, dass du da bist. Wie heißt du?</p>
       </div>
       <section class="list"><div class="row-in"><input id="wcName" class="wide" style="text-align:left" placeholder="Dein Vorname" autocapitalize="words" autocomplete="given-name" enterkeyhint="next" aria-label="Dein Vorname"></div></section>
+      ${S.referredBy ? '' : `<div class="hdr"><span>Wer hat dir Biss empfohlen?</span></div>
+      <section class="list"><div class="row-in"><input id="wcRef" class="wide" style="text-align:left" placeholder="Name, optional" autocapitalize="words" enterkeyhint="next" aria-label="Wer hat dir Biss empfohlen?"></div></section>
+      <p class="note" style="margin-top:-6px">Dann bekommt die Person Punkte fürs Weiterempfehlen.</p>`}
       <button class="btn" id="wcNext">Weiter</button>`;
-    const inp = $('#wcName', el);
+    const inp = $('#wcName', el), refInp = $('#wcRef', el);
     const next = () => {
       const name = inp.value.trim().slice(0, 30);
       if (!name) { toast('Wie heißt du?'); inp.focus(); return; }
-      S.name = name; save(); render(); greet();
+      S.name = name;
+      const ref = refInp ? refInp.value.trim().slice(0, 40) : '';
+      if (ref) { S.referredBy = ref; S.refSent = false; }
+      save(); render(); greet();
+      if (ref) sendReferral();
     };
     $('#wcNext', el).addEventListener('click', next);
-    inp.addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); next(); } });
+    inp.addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); if (refInp) refInp.focus(); else next(); } });
+    if (refInp) refInp.addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); next(); } });
   });
 }
 function confetti() {
@@ -1429,6 +1483,7 @@ const ACT = {
   healthHelp: () => openHealthHelp(),
   shareApp: () => openShare(),
   shareLink: () => shareLink(),
+  referral: () => openReferral(),
   range: b => { histRange = b.dataset.n; histOff = 0; render(); },
   histStep: b => { histOff = Math.max(0, histOff + +b.dataset.d); render(); },
   openmonth: b => { const [y, m] = b.dataset.k.split('-').map(Number), n = kdate(todayKey()); histRange = 'month'; histOff = (n.getFullYear() - y) * 12 + n.getMonth() - (m - 1); render(); window.scrollTo(0, 0); },
@@ -1498,6 +1553,7 @@ document.addEventListener('visibilitychange', () => {
 if (!S.badges) { initBadges(); save(); }
 render();
 if (!S.setup || !S.greeted) openWelcome();
+sendReferral();
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 if ('serviceWorker' in navigator && location.protocol === 'https:') {
   // Neue Version: Seite einmal neu laden, sobald der neue Service Worker übernimmt
