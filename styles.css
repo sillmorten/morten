@@ -310,4 +310,18 @@ i.o { background: var(--org); }
 
 /* Sperr-Bildschirm */
 #lock { position: fixed; inset: 0; z-index: 100; background: var(--bg); display: flex; align-items: center; justify-content: center; padding: 24px; padding-top: calc(env(safe-area-inset-top, 0px) + 24px); padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 24px); }
-#lock .hello-ic { width: 96px; height: 96px; border-radius: 22px; margin-bottom: 8px; -webkit-tap-highlight-color: transparent; }
+#lock { animation: lkFade .35s ease-out both; }
+#lock .hello-ic { position: relative; width: 104px; height: 104px; border-radius: 24px; -webkit-tap-highlight-color: transparent; }
+.lk-ic { position: relative; margin-bottom: 18px; animation: lkPop .6s cubic-bezier(.34,1.56,.64,1) both, lkFloat 3.2s ease-in-out .6s infinite; }
+.lk-glow { position: absolute; inset: -14px; border-radius: 34px; background: var(--tint); opacity: .25; filter: blur(18px); animation: lkGlow 3.2s ease-in-out infinite; }
+.lk-badge { position: absolute; right: -12px; bottom: -12px; width: 44px; height: 44px; border-radius: 50%; background: var(--g1); color: var(--tint); display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 14px rgba(0,0,0,.18); transform-origin: 50% 20%; animation: lkDrop .5s cubic-bezier(.34,1.56,.64,1) .45s both, lkShake 3.2s ease-in-out 1.2s infinite; }
+.lk-badge svg { width: 24px; height: 24px; }
+.lk-in { animation: lkUp .5s ease-out both; }
+@keyframes lkFade { from { opacity: 0; } }
+@keyframes lkPop { from { opacity: 0; transform: scale(.5); } }
+@keyframes lkFloat { 50% { transform: translateY(-8px); } }
+@keyframes lkGlow { 50% { opacity: .45; transform: scale(1.06); } }
+@keyframes lkDrop { from { opacity: 0; transform: translateY(-30px) scale(.4); } }
+@keyframes lkShake { 0%, 30%, 100% { transform: rotate(0); } 5% { transform: rotate(-16deg); } 10% { transform: rotate(14deg); } 15% { transform: rotate(-10deg); } 20% { transform: rotate(6deg); } 25% { transform: rotate(-3deg); } }
+@keyframes lkUp { from { opacity: 0; transform: translateY(14px); } }
+@media (prefers-reduced-motion: reduce) { #lock, #lock * { animation: none !important; } }

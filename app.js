@@ -29,7 +29,7 @@ const DONATE_URL = 'https://paypal.me/MortenUkena';
 // Verbesserungswünsche gehen über Formspree direkt an den Entwickler. Leer lassen, um den Eintrag auszublenden.
 const WISH_URL = 'https://formspree.io/f/xeepbyjn';
 // Versionsnummer für die Anzeige in der App. Bei jedem Update zusammen mit VERSION in sw.js hochzählen.
-const APP_VERSION = '1.6.0';
+const APP_VERSION = '1.6.1';
 const KEY = 'kalorien.v1';
 const DEFAULTS = () => ({
   v: 1, setup: false, name: '', greeted: false, goals: { kcal: 2500, c: 280, p: 150, f: 80 }, weightKg: 80, days: {}, foods: {}, weights: [], lastBackup: null,
@@ -1560,9 +1560,10 @@ function showLock(st) {
   if (!st || !st.gesperrt || lsGet(OWNER_KEY) === '1') { if (el) el.remove(); return; }
   if (!el) { el = document.createElement('div'); el.id = 'lock'; el.setAttribute('role', 'alertdialog'); document.body.appendChild(el); }
   el.innerHTML = `<div class="hello">
-      <img src="icons/icon-192.png" alt="" class="hello-ic" id="lockIc">
-      <h2>${esc(st.titel || 'Biss ist gerade gesperrt')}</h2>
-      <p>${esc(st.text || 'Die App wird bald wieder freigegeben. Deine Daten bleiben erhalten.')}</p>
+      <div class="lk-ic"><span class="lk-glow"></span><img src="icons/icon-192.png" alt="" class="hello-ic" id="lockIc">
+        <span class="lk-badge"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 10V7a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><rect x="5" y="10" width="14" height="11" rx="3" fill="currentColor"/></svg></span></div>
+      <h2 class="lk-in" style="animation-delay:.25s">${esc(st.titel || 'Biss ist gerade gesperrt')}</h2>
+      <p class="lk-in" style="animation-delay:.4s">${esc(st.text || 'Die App wird bald wieder freigegeben. Deine Daten bleiben erhalten.')}</p>
     </div>`;
   // Für den Besitzer: 7× aufs Icon tippen hebt die Sperre auf diesem Gerät auf
   let taps = 0, tT;
