@@ -29,12 +29,12 @@ const DONATE_URL = 'https://paypal.me/MortenUkena';
 // Verbesserungswünsche gehen über Formspree direkt an den Entwickler. Leer lassen, um den Eintrag auszublenden.
 const WISH_URL = 'https://formspree.io/f/xeepbyjn';
 // Versionsnummer für die Anzeige in der App. Bei jedem Update zusammen mit VERSION in sw.js hochzählen.
-const APP_VERSION = '1.3.0';
+const APP_VERSION = '1.4.0';
 const KEY = 'kalorien.v1';
 const DEFAULTS = () => ({
   v: 1, setup: false, name: '', greeted: false, goals: { kcal: 2500, c: 280, p: 150, f: 80 }, weightKg: 80, days: {}, foods: {}, weights: [], lastBackup: null,
   supps: [{ id: 'kreatin', name: 'Kreatin', dose: '5 g' }, { id: 'shake', name: 'Protein-Shake', dose: '' }, { id: 'vitamine', name: 'Vitamine', dose: '' }],
-  suppLog: {}, body: [], photos: [], badges: null,
+  suppLog: {}, body: [], photos: [], badges: null, profile: null,
 });
 // Ältere Speicherstände und Backups bekommen fehlende Felder mit Standardwerten
 function normalize(o) {
@@ -363,6 +363,7 @@ function viewGoals() {
   return `
   <header class="nav"></header>
   <h1 class="lt">Ziele</h1>
+  <section class="list icons"><button class="it" data-act="calc">${tile('target', ['#ff5c7c', '#e8264d'])}<div class="n"><b>${S.profile ? 'Ziele neu berechnen' : 'Ziele berechnen lassen'}</b><span>${goalSub()}</span></div><span class="chev">${icon('right')}</span></button></section>
   <div class="hdr"><span>Tagesziele</span></div>
   <section class="list">
     ${inp('kcal', 'Kalorien', g.kcal, 'kcal')}
@@ -1195,18 +1196,112 @@ function importBackup(file) {
   r.readAsText(file);
 }
 
+/* ---------- Ziel-Rechner ---------- */
+const ACTIVITY = [
+  { f: 1.2, n: 'Kaum aktiv', d: 'Bürojob, wenig Bewegung' },
+  { f: 1.375, n: 'Leicht aktiv', d: '1–3× Sport pro Woche' },
+  { f: 1.55, n: 'Aktiv', d: '3–5× Sport pro Woche' },
+  { f: 1.725, n: 'Sehr aktiv', d: '6–7× Sport oder körperliche Arbeit' },
+  { f: 1.9, n: 'Extrem aktiv', d: 'Harte Arbeit und tägliches Training' },
+];
+// Grundumsatz nach Mifflin-St Jeor, Gesamtumsatz über den Aktivitätsfaktor, 7.700 kcal ≈ 1 kg Körperfett
+function calcGoals(p) {
+  if (!(p.age >= 14 && p.age <= 100 && p.height >= 120 && p.height <= 230 && p.weight >= 35 && p.weight <= 300)) return null;
+  const bmr = 10 * p.weight + 6.25 * p.height - 5 * p.age + (p.sex === 'w' ? -161 : 5);
+  const tdee = bmr * p.act;
+  const target = p.target >= 35 && p.target <= 300 ? p.target : p.weight;
+  const diff = target - p.weight, mode = Math.abs(diff) < 0.5 ? 'keep' : diff < 0 ? 'lose' : 'gain';
+  const pace = mode === 'gain' ? Math.min(p.pace, 0.5) : p.pace;
+  let kcal = mode === 'keep' ? tdee : tdee + (mode === 'lose' ? -1 : 1) * pace * 7700 / 7;
+  const floor = Math.max(bmr, p.sex === 'w' ? 1200 : 1500);
+  const clamped = mode === 'lose' && kcal < floor;
+  if (clamped) kcal = floor;
+  kcal = Math.round(kcal / 10) * 10;
+  const realPace = mode === 'keep' ? 0 : Math.abs(kcal - tdee) * 7 / 7700;
+  const weeks = realPace > 0 ? Math.abs(diff) / realPace : 0;
+  // Eiweiß beim Abnehmen 2 g pro kg Zielgewicht (schützt die Muskeln), sonst 1,8 g pro kg
+  const prot = Math.round(mode === 'lose' ? 2 * target : 1.8 * p.weight);
+  const fat = Math.round(Math.max(kcal * 0.25 / 9, 0.8 * p.weight));
+  const carbs = Math.max(0, Math.round((kcal - prot * 4 - fat * 9) / 4));
+  return { bmr, tdee, kcal, p: prot, f: fat, c: carbs, mode, target, weeks, realPace, clamped, eta: weeks ? addDays(todayKey(), Math.ceil(weeks * 7)) : null };
+}
+const longDateY = k => { const d = kdate(k); return `${d.getDate()}. ${MON[d.getMonth()]} ${d.getFullYear()}`; };
+function renderCalc(box, { onDone, onSkip } = {}) {
+  const lastW = S.weights.length ? S.weights[S.weights.length - 1].kg : S.weightKg;
+  const p = { sex: 'm', age: '', height: '', target: '', act: 1.55, pace: 0.5, ...(S.profile || {}), weight: lastW };
+  const v = x => x ? n1(x) : '';
+  box.innerHTML = `
+    <div class="sh"><div class="t"><b>Ziele berechnen</b><span>Aus deinen Daten, dauert eine Minute</span></div>${onSkip ? '' : `<button class="xb" data-act="close" aria-label="Schließen">${icon('x')}</button>`}</div>
+    <div class="seg" id="cSex"><button data-v="m">Mann</button><button data-v="w">Frau</button></div>
+    <section class="list">
+      <div class="row-in"><label for="cAge">Alter</label><input id="cAge" inputmode="numeric" value="${p.age || ''}" placeholder="25"><span class="u">Jahre</span></div>
+      <div class="row-in"><label for="cH">Größe</label><input id="cH" inputmode="numeric" value="${p.height || ''}" placeholder="180"><span class="u">cm</span></div>
+      <div class="row-in"><label for="cW">Gewicht jetzt</label><input id="cW" inputmode="decimal" value="${v(p.weight)}" placeholder="80"><span class="u">kg</span></div>
+      <div class="row-in"><label for="cT">Zielgewicht</label><input id="cT" inputmode="decimal" value="${v(p.target)}" placeholder="z. B. 75"><span class="u">kg</span></div>
+    </section>
+    <div class="hdr"><span>Wie aktiv bist du?</span></div>
+    <section class="list" id="cAct">${ACTIVITY.map(a => `<button class="it" data-v="${a.f}"><div class="n"><b>${a.n}</b><span>${a.d}</span></div><span class="chk">${icon('check')}</span></button>`).join('')}</section>
+    <div id="cPaceWrap"><div class="hdr"><span id="cPaceLbl">Tempo</span></div><div class="seg" id="cPace" style="margin-top:8px"><button data-v="0.25">Gemütlich</button><button data-v="0.5">Normal</button><button data-v="0.75">Schnell</button></div></div>
+    <div id="cRes"></div>
+    <button class="btn" id="cOk" disabled>Ziele übernehmen</button>
+    ${onSkip ? `<button class="btn del" id="cSkip" style="color:var(--l2)">Überspringen, später einstellen</button>` : ''}
+    <p class="note">Das ist eine Schätzung. Wenn sich dein Gewicht nach 2–3 Wochen anders entwickelt als geplant, rechne einfach neu oder pass die Ziele unter „Ziele“ an.</p>`;
+  const segSel = (id, val) => box.querySelectorAll(`#${id} [data-v]`).forEach(b => b.classList.toggle('on', b.dataset.v === String(val)));
+  const actSel = () => box.querySelectorAll('#cAct [data-v]').forEach(b => b.querySelector('.chk').classList.toggle('on', +b.dataset.v === p.act));
+  let res = null;
+  const upd = () => {
+    p.age = num($('#cAge', box).value); p.height = num($('#cH', box).value); p.weight = num($('#cW', box).value); p.target = num($('#cT', box).value);
+    res = calcGoals(p);
+    const mode = res ? res.mode : (p.target && p.weight ? (Math.abs(p.target - p.weight) < .5 ? 'keep' : p.target < p.weight ? 'lose' : 'gain') : 'keep');
+    $('#cPaceWrap', box).hidden = mode === 'keep';
+    if (mode === 'gain' && p.pace > .5) p.pace = .5;
+    $('#cPaceLbl', box).textContent = `${mode === 'gain' ? 'Wie schnell zunehmen?' : 'Wie schnell abnehmen?'} · ${String(p.pace).replace('.', ',')} kg pro Woche`;
+    box.querySelector('#cPace [data-v="0.75"]').hidden = mode === 'gain';
+    segSel('cPace', p.pace);
+    $('#cOk', box).disabled = !res;
+    if (!res) { $('#cRes', box).innerHTML = `<section class="card"><p class="note" style="margin:0">Trag Alter, Größe und Gewicht ein, dann siehst du hier deine Ziele.</p></section>`; return; }
+    const what = res.mode === 'keep' ? 'Gewicht halten' : res.mode === 'lose' ? `${n1(p.weight - res.target)} kg abnehmen` : `${n1(res.target - p.weight)} kg zunehmen`;
+    $('#cRes', box).innerHTML = `<section class="card calcres">
+      <div class="ctop">Dein Tagesziel · ${what}</div>
+      <div class="big"><b class="num">${n0(res.kcal)}</b><span>kcal pro Tag</span></div>
+      <div class="nut" style="background:var(--g2);margin-top:10px"><div><b class="num" style="color:var(--org)">${n0(res.c)} g</b><span>KH</span></div><div><b class="num" style="color:var(--grn)">${n0(res.p)} g</b><span>Eiweiß</span></div><div><b class="num" style="color:var(--blu)">${n0(res.f)} g</b><span>Fett</span></div><div><b class="num">${n0(res.tdee)}</b><span>Verbrauch</span></div></div>
+      ${res.eta ? `<div class="eta">🎯 Zielgewicht ${n1(res.target)} kg voraussichtlich am <b>${longDateY(res.eta)}</b><span>in etwa ${res.weeks < 9 ? `${Math.ceil(res.weeks)} Wochen` : `${Math.round(res.weeks / 4.35)} Monaten`} · ${n1(res.realPace)} kg pro Woche</span></div>` : ''}
+      ${res.clamped ? `<p class="note" style="margin:8px 0 0">Weniger als ${n0(res.kcal)} kcal sind auf Dauer nicht gesund. Deshalb dauert es etwas länger als gewählt.</p>` : ''}
+      <p class="note" style="margin:8px 0 0;text-align:left">Grundumsatz ${n0(res.bmr)} kcal × Aktivität ${String(p.act).replace('.', ',')} = Verbrauch ${n0(res.tdee)} kcal${res.mode === 'keep' ? '' : `, ${res.mode === 'lose' ? 'minus' : 'plus'} ${n0(Math.abs(res.kcal - res.tdee))} kcal`}.</p>
+    </section>`;
+  };
+  segSel('cSex', p.sex); actSel();
+  box.querySelectorAll('#cSex [data-v]').forEach(b => b.addEventListener('click', () => { p.sex = b.dataset.v; segSel('cSex', p.sex); upd(); }));
+  box.querySelectorAll('#cPace [data-v]').forEach(b => b.addEventListener('click', () => { p.pace = +b.dataset.v; upd(); }));
+  box.querySelectorAll('#cAct [data-v]').forEach(b => b.addEventListener('click', () => { p.act = +b.dataset.v; actSel(); upd(); }));
+  box.querySelectorAll('input').forEach(i => i.addEventListener('input', upd));
+  $('#cOk', box).addEventListener('click', () => {
+    if (!res) return;
+    S.goals = { kcal: res.kcal, c: res.c, p: res.p, f: res.f };
+    S.profile = { sex: p.sex, age: p.age, height: p.height, target: res.target, act: p.act, pace: p.pace, at: todayKey() };
+    S.weightKg = p.weight;
+    const t = todayKey();
+    if (!S.weights.some(w => w.date === t) && Math.abs((S.weights.length ? S.weights[S.weights.length - 1].kg : 0) - p.weight) > 0.05) { S.weights.push({ date: t, kg: p.weight }); S.weights.sort((a, b) => a.date.localeCompare(b.date)); }
+    save(); buzz(); render(); toast(`Neues Tagesziel: ${n0(res.kcal)} kcal`);
+    if (onDone) onDone(); else closeTop();
+  });
+  if (onSkip) $('#cSkip', box).addEventListener('click', onSkip);
+  upd();
+}
+function openCalc() {
+  openLayer('sheet', `<div id="calcBody" style="display:flex;flex-direction:column;gap:14px"></div>`, el => renderCalc($('#calcBody', el)));
+}
+function goalSub() {
+  const pr = S.profile;
+  if (!pr) return 'Aus Alter, Größe, Gewicht und Zielgewicht';
+  const r = calcGoals({ ...pr, weight: S.weights.length ? S.weights[S.weights.length - 1].kg : S.weightKg });
+  if (!r || r.mode === 'keep') return `Gewicht halten · berechnet am ${shortDate(pr.at)}`;
+  return `Ziel ${n1(r.target)} kg${r.eta ? ` · voraussichtlich am ${shortDate(r.eta)}` : ''}`;
+}
+
 /* ---------- Ersteinrichtung ---------- */
 function openWelcome() {
   const firstSetup = !S.setup;
-  const goals = !firstSetup ? '' : `
-    <p class="note" style="text-align:left">Stell kurz deine Tagesziele ein. Alles bleibt auf deinem iPhone, und du kannst es später unter <b>Ziele</b> ändern.</p>
-    <section class="list">
-      <div class="row-in"><label for="w_kcal">Kalorien</label><input id="w_kcal" inputmode="decimal" value="${S.goals.kcal}"><span class="u">kcal</span></div>
-      <div class="row-in"><label for="w_c">Kohlenhydrate</label><input id="w_c" inputmode="decimal" value="${S.goals.c}"><span class="u">g</span></div>
-      <div class="row-in"><label for="w_p">Eiweiß</label><input id="w_p" inputmode="decimal" value="${S.goals.p}"><span class="u">g</span></div>
-      <div class="row-in"><label for="w_f">Fett</label><input id="w_f" inputmode="decimal" value="${S.goals.f}"><span class="u">g</span></div>
-      <div class="row-in"><label for="w_kg">Körpergewicht</label><input id="w_kg" inputmode="decimal" value="${n1(S.weightKg)}"><span class="u">kg</span></div>
-    </section>`;
   // Nur ein einziges Mal zeigen, auch wenn das Fenster weggewischt wird
   S.greeted = true; S.setup = true; save();
   openLayer('sheet', `<div id="wcBody" style="display:flex;flex-direction:column;gap:14px"></div>`, el => {
@@ -1217,14 +1312,12 @@ function openWelcome() {
           <img src="icons/icon-192.png" alt="" class="hello-ic">
           <h2>Hey ${n || 'du'}! 🎉</h2>
           <p>Viel Spaß mit deiner eigenen App! Kein Abo, keine Werbung, kein Schnickschnack. Nur du, dein Essen und deine Ziele.</p>
-        </div>${goals}<button class="btn" id="wcOk">Los geht’s${n ? ', ' + n : ''}!</button>`;
+        </div>${firstSetup ? `<p class="note">Jetzt rechnen wir aus, wie viele Kalorien und Makros zu dir und deinem Zielgewicht passen. Alles bleibt auf deinem iPhone.</p>` : ''}<button class="btn" id="wcOk">${firstSetup ? 'Meine Ziele berechnen' : `Los geht’s${n ? ', ' + n : ''}!`}</button>`;
       confetti();
       $('#wcOk', el).addEventListener('click', () => {
-        if (firstSetup) {
-          for (const k of ['kcal', 'c', 'p', 'f']) { const v = num($('#w_' + k, el).value); if (v > 0) S.goals[k] = Math.round(v); }
-          const kg = num($('#w_kg', el).value); if (kg > 20 && kg < 400) S.weightKg = kg;
-        }
-        save(); closeTop(); render();
+        if (!firstSetup) { save(); closeTop(); render(); return; }
+        renderCalc(body, { onDone: closeTop, onSkip: () => { closeTop(); toast('Du kannst die Ziele jederzeit unter „Ziele“ berechnen'); } });
+        el.scrollTop = 0;
       });
     };
     if (S.name) { greet(); return; }
@@ -1298,6 +1391,7 @@ const ACT = {
   body: () => openBody(),
   badges: () => openBadges(),
   supps: () => openSupps(),
+  calc: () => openCalc(),
   wish: () => openWish(),
   photo: b => openPhoto(b.dataset.id),
   addPhoto: () => { const f = bodyEl && $('#phFile', bodyEl); if (f) f.click(); },

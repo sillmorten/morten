@@ -299,3 +299,9 @@ i.o { background: var(--org); }
 .clegend { display: flex; justify-content: center; gap: 16px; margin-top: 10px; font-size: 12px; color: var(--l2); }
 .clegend span { display: flex; align-items: center; gap: 5px; }
 .clegend i { width: 7px; height: 7px; border-radius: 50%; display: block; }
+
+/* Ziel-Rechner */
+.calcres .eta { margin-top: 12px; padding: 10px 12px; border-radius: 12px; background: color-mix(in srgb, var(--tint) 10%, transparent); font-size: 15px; line-height: 1.35; }
+.calcres .eta b { color: var(--tint); }
+.calcres .eta span { display: block; font-size: 13px; color: var(--l2); margin-top: 2px; }
+#cAct .chk.on { background: var(--tint); border-color: var(--tint); }
