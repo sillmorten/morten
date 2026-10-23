@@ -32,3 +32,8 @@ Icons: [Phosphor Icons](https://phosphoricons.com) (MIT). Barcode: [ZXing](https
 In `status.json` steuert `"gesperrt": true` einen Sperr-Bildschirm für alle Nutzer, `false` gibt die App wieder frei.
 Titel und Text lassen sich dort ebenfalls ändern. Die Daten auf den Geräten bleiben unberührt.
 Auf dem eigenen Gerät hebt 7× Tippen aufs Icon im Sperr-Bildschirm die Sperre dauerhaft auf.
+
+## Punkte fürs Werben
+7× auf die Versionsnummer unten in „Ziele“ tippen schaltet den Besitzer-Modus an (und wieder aus).
+Dann erscheint „Punkte vergeben“: Name des Werbers eintragen (wie in seiner App), Punkte wählen, Code senden.
+Der Werber löst ihn unter „Ziele → Meine Punkte“ ein. Jeder Code gilt nur für diesen Namen und nur einmal.

@@ -29,17 +29,17 @@ const DONATE_URL = 'https://paypal.me/MortenUkena';
 // Verbesserungswünsche gehen über Formspree direkt an den Entwickler. Leer lassen, um den Eintrag auszublenden.
 const WISH_URL = 'https://formspree.io/f/xeepbyjn';
 // Versionsnummer für die Anzeige in der App. Bei jedem Update zusammen mit VERSION in sw.js hochzählen.
-const APP_VERSION = '1.6.1';
+const APP_VERSION = '1.7.0';
 const KEY = 'kalorien.v1';
 const DEFAULTS = () => ({
-  v: 1, setup: false, name: '', greeted: false, goals: { kcal: 2500, c: 280, p: 150, f: 80 }, weightKg: 80, days: {}, foods: {}, weights: [], lastBackup: null,
+  v: 1, setup: false, name: '', points: 0, usedCodes: [], greeted: false, goals: { kcal: 2500, c: 280, p: 150, f: 80 }, weightKg: 80, days: {}, foods: {}, weights: [], lastBackup: null,
   supps: [{ id: 'kreatin', name: 'Kreatin', dose: '5 g' }, { id: 'shake', name: 'Protein-Shake', dose: '' }, { id: 'vitamine', name: 'Vitamine', dose: '' }],
   suppLog: {}, body: [], photos: [], badges: null, profile: null,
 });
 // Ältere Speicherstände und Backups bekommen fehlende Felder mit Standardwerten
 function normalize(o) {
   const d = DEFAULTS(), s = { ...d, ...o, goals: { ...d.goals, ...(o.goals || {}) } };
-  for (const k of ['weights', 'supps', 'body', 'photos']) if (!Array.isArray(s[k])) s[k] = d[k];
+  for (const k of ['weights', 'supps', 'body', 'photos', 'usedCodes']) if (!Array.isArray(s[k])) s[k] = d[k];
   for (const k of ['days', 'foods', 'suppLog']) if (!s[k] || typeof s[k] !== 'object') s[k] = {};
   if (s.badges && typeof s.badges !== 'object') s.badges = null;
   return s;
@@ -386,14 +386,16 @@ function viewGoals() {
   </section>
   <div class="hdr"><span>Teilen</span></div>
   <section class="list icons"><button class="it" data-act="shareApp">${tile('share', ['#ff6b8a', '#e3123f'])}<div class="n"><b>App teilen</b><span>QR-Code zeigen, Punkte sammeln</span></div><span class="chev">${icon('right')}</span></button>
-    ${WISH_URL ? (S.referredBy ? `<div class="it">${tile('trophy', ['#ffd60a', '#f5a300'])}<div class="n"><b>Geworben von</b><span>${esc(S.referredBy)}</span></div></div>` : `<button class="it" data-act="referral">${tile('trophy', ['#ffd60a', '#f5a300'])}<div class="n"><b>Wer hat dich geworben?</b><span>Die Person bekommt dafür Punkte</span></div><span class="chev">${icon('right')}</span></button>`) : ''}</section>
+    ${WISH_URL ? (S.referredBy ? `<div class="it">${tile('trophy', ['#ffd60a', '#f5a300'])}<div class="n"><b>Geworben von</b><span>${esc(S.referredBy)}</span></div></div>` : `<button class="it" data-act="referral">${tile('trophy', ['#ffd60a', '#f5a300'])}<div class="n"><b>Wer hat dich geworben?</b><span>Die Person bekommt dafür Punkte</span></div><span class="chev">${icon('right')}</span></button>`) : ''}
+    <button class="it" data-act="points">${tile('medal', ['#ff9f0a', '#f56300'])}<div class="n"><b>Meine Punkte</b><span>${n0(S.points || 0)} Punkte${pointBadge() ? ' · ' + pointBadge().name : ''} · Code einlösen</span></div><span class="chev">${icon('right')}</span></button>
+    ${isOwner() ? `<button class="it" data-act="givePoints">${tile('starF', ['#30d158', '#1a9e3f'])}<div class="n"><b>Punkte vergeben</b><span>Nur für dich: Code für einen Werber erstellen</span></div><span class="chev">${icon('right')}</span></button>` : ''}</section>
   ${WISH_URL ? `<div class="hdr"><span>Feedback</span></div>
   <section class="list icons"><button class="it" data-act="wish">${tile('sparkle', ['#ffd60a', '#f5a300'])}<div class="n"><b>Wunsch senden 💡</b><span>Was fehlt dir? Sag’s dem Entwickler</span></div><span class="chev">${icon('right')}</span></button></section>` : ''}
   ${DONATE_URL ? `<div class="hdr"><span>Unterstützen</span></div>
   <section class="list icons"><a class="it" href="${esc(DONATE_URL)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">${tile('paypal', ['#009cde', '#003087'])}<div class="n"><b>Entwickler unterstützen ☕</b><span>Freiwillige Spende per PayPal</span></div><span class="chev">${icon('right')}</span></a></section>` : ''}
   <p class="foot">Alle Daten bleiben auf diesem Gerät. Es gibt kein Konto und keine Werbung. Eingebaute Lebensmittel sind Richtwerte. Die Online-Suche und der Barcode-Scan nutzen Open Food Facts (offene Datenbank, ODbL).</p>
   <section class="list"><button class="it danger" data-act="wipe">Alle Daten löschen</button></section>
-  <p class="ver">Biss · Version ${APP_VERSION}</p>`;
+  <p class="ver" data-act="verTap">Biss · Version ${APP_VERSION}${isOwner() ? ' · Besitzer' : ''}</p>`;
 }
 
 /* ---------- Ebenen (Sheets und Seiten) ---------- */
@@ -1203,6 +1205,91 @@ function openReferral() {
   });
 }
 
+/* ---------- Punkte ---------- */
+// Punkte-Codes ohne Server: Der Besitzer erstellt einen Code für einen Namen, der Werber löst ihn einmal ein.
+// Format P<Punkte>-<Zufall>-<Prüfsumme>. Die Prüfsumme hängt am Namen, damit nur die richtige Person den Code nutzen kann.
+const PT_SALT = 'biss-punkte-2026';
+const PT_BADGES = [[1000, 'Gold-Werber 🥇'], [500, 'Silber-Werber 🥈'], [100, 'Bronze-Werber 🥉']];
+const pointBadge = () => { const b = PT_BADGES.find(([n]) => (S.points || 0) >= n); return b ? { min: b[0], name: b[1] } : null; };
+const isOwner = () => lsGet(OWNER_KEY) === '1';
+const B32 = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+function ptHash(str) {
+  let h = 0x811c9dc5;
+  for (const ch of str) { h ^= ch.codePointAt(0); h = Math.imul(h, 0x01000193) >>> 0; }
+  let o = ''; for (let i = 0; i < 5; i++) { o += B32[h & 31]; h >>>= 5; } return o;
+}
+const ptName = n => String(n || '').trim().toLowerCase();
+function makeCode(name, pts) {
+  let nonce = ''; for (let i = 0; i < 4; i++) nonce += B32[Math.floor(Math.random() * 32)];
+  return `P${pts}-${nonce}-${ptHash(PT_SALT + '|' + ptName(name) + '|' + pts + '|' + nonce)}`;
+}
+function redeemCode(raw) {
+  const m = String(raw).toUpperCase().replace(/\s+/g, '').match(/^P(\d{1,4})-([A-Z2-9]{4})-([A-Z2-9]{5})$/);
+  if (!m) return { err: 'Das ist kein gültiger Punkte-Code' };
+  const [, pts, nonce, sig] = m, code = `P${pts}-${nonce}-${sig}`;
+  if ((S.usedCodes || []).includes(code)) return { err: 'Diesen Code hast du schon eingelöst' };
+  if (ptHash(PT_SALT + '|' + ptName(S.name) + '|' + pts + '|' + nonce) !== sig) return { err: `Dieser Code gehört zu einem anderen Namen. Dein Name in Biss: ${S.name || 'nicht gesetzt'}` };
+  S.usedCodes = [...(S.usedCodes || []), code]; S.points = (S.points || 0) + +pts; save();
+  return { pts: +pts };
+}
+function openPoints() {
+  openLayer('sheet', `<div id="ptBody" style="display:flex;flex-direction:column;gap:14px"></div>`, el => {
+    const body = $('#ptBody', el);
+    const draw = () => {
+      const b = pointBadge(), next = [...PT_BADGES].reverse().find(([n]) => (S.points || 0) < n);
+      body.innerHTML = `
+        <div class="sh"><div class="t"><b>Meine Punkte</b><span>Fürs Weiterempfehlen von Biss</span></div><button class="xb" data-act="close" aria-label="Schließen">${icon('x')}</button></div>
+        <div class="hello"><div style="font-size:56px;line-height:1.1">${b ? b.name.slice(-2) : '🏆'}</div><h2 class="num">${n0(S.points || 0)} Punkte</h2>
+          <p>${b ? b.name : 'Noch kein Abzeichen'}${next ? ` · noch ${n0(next[0] - (S.points || 0))} bis ${next[1]}` : ''}</p></div>
+        <section class="list"><div class="row-in"><input id="ptCode" class="wide" style="text-align:left;text-transform:uppercase" placeholder="Code, z. B. P100-AB3C-XY7Z9" autocapitalize="characters" autocomplete="off" spellcheck="false" enterkeyhint="done" aria-label="Punkte-Code"></div></section>
+        <button class="btn" id="ptOk">Code einlösen</button>
+        <p class="note">So gibt’s Punkte: Freunde tragen beim ersten Start <b>${esc(S.name || 'deinen Namen')}</b> als Empfehlung ein. Du bekommst dann vom Entwickler einen Code.</p>`;
+      const inp = $('#ptCode', el);
+      const go = () => {
+        const r = redeemCode(inp.value);
+        if (r.err) { toast(r.err); inp.focus(); return; }
+        buzz(); confetti(); render(); draw(); toast(`+${n0(r.pts)} Punkte 🏆`);
+      };
+      $('#ptOk', el).addEventListener('click', go);
+      inp.addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); go(); } });
+    };
+    draw();
+  });
+}
+function openGivePoints() {
+  openLayer('sheet', `<div id="gpBody" style="display:flex;flex-direction:column;gap:14px"></div>`, el => {
+    const body = $('#gpBody', el);
+    let pts = 100;
+    body.innerHTML = `
+      <div class="sh"><div class="t"><b>Punkte vergeben</b><span>Code für einen Werber erstellen</span></div><button class="xb" data-act="close" aria-label="Schließen">${icon('x')}</button></div>
+      <section class="list"><div class="row-in"><input id="gpName" class="wide" style="text-align:left" placeholder="Name des Werbers, genau wie in seiner App" autocapitalize="words" aria-label="Name des Werbers"></div></section>
+      <div class="chips" id="gpPts">${[50, 100, 250, 500].map(n => `<button class="chip${n === pts ? ' on' : ''}" data-v="${n}">${n} Punkte</button>`).join('')}</div>
+      <button class="btn" id="gpOk">Code erstellen und senden</button>
+      <div id="gpOut"></div>`;
+    $('#gpPts', el).querySelectorAll('[data-v]').forEach(b => b.addEventListener('click', () => {
+      pts = +b.dataset.v; $('#gpPts', el).querySelectorAll('.chip').forEach(c => c.classList.toggle('on', c === b));
+    }));
+    $('#gpOk', el).addEventListener('click', async () => {
+      const name = $('#gpName', el).value.trim();
+      if (!name) { toast('Für wen ist der Code?'); $('#gpName', el).focus(); return; }
+      const code = makeCode(name, pts);
+      const msg = `Hey ${name}, danke fürs Weiterempfehlen! Du bekommst ${pts} Biss-Punkte 🏆\nÖffne Biss → Ziele → Meine Punkte und gib diesen Code ein:\n${code}`;
+      $('#gpOut', el).innerHTML = `<section class="card" style="text-align:center"><div class="note" style="margin-bottom:6px">Code für ${esc(name)}</div><div style="font-size:24px;font-weight:700;letter-spacing:.04em;user-select:all">${code}</div></section>`;
+      try { if (navigator.share) { await navigator.share({ text: msg }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
+      try { await navigator.clipboard.writeText(msg); toast('Nachricht kopiert'); } catch (e) { /* Code steht ja da */ }
+    });
+  });
+}
+let verTaps = 0, verT;
+function verTap() {
+  clearTimeout(verT); verT = setTimeout(() => { verTaps = 0; }, 2000);
+  if (++verTaps < 7) return;
+  verTaps = 0;
+  if (isOwner()) { try { localStorage.removeItem(OWNER_KEY); } catch (e) { /* egal */ } toast('Besitzer-Modus aus'); }
+  else { lsSet(OWNER_KEY, '1'); toast('Besitzer-Modus an'); }
+  render();
+}
+
 /* ---------- Backup ---------- */
 let bkPhotos = null;
 function openBackup() {
@@ -1484,6 +1571,9 @@ const ACT = {
   shareApp: () => openShare(),
   shareLink: () => shareLink(),
   referral: () => openReferral(),
+  points: () => openPoints(),
+  givePoints: () => openGivePoints(),
+  verTap: () => verTap(),
   range: b => { histRange = b.dataset.n; histOff = 0; render(); },
   histStep: b => { histOff = Math.max(0, histOff + +b.dataset.d); render(); },
   openmonth: b => { const [y, m] = b.dataset.k.split('-').map(Number), n = kdate(todayKey()); histRange = 'month'; histOff = (n.getFullYear() - y) * 12 + n.getMonth() - (m - 1); render(); window.scrollTo(0, 0); },
