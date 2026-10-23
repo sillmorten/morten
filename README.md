@@ -6,6 +6,7 @@ Alle Daten bleiben lokal auf dem Gerät (localStorage). Lebensmittel kommen von
 
 ## Funktionen
 - Tagesübersicht: gegessen, verbrannt, übrig, Kohlenhydrate, Eiweiß, Fett
+- Ziel-Rechner: Kalorien und Makros aus Alter, Größe, Gewicht, Zielgewicht und Aktivität (Mifflin-St Jeor), mit Zieldatum
 - Über 180 eingebaute Alltags-Lebensmittel mit Portionsgrößen (funktionieren offline)
 - Eintragen per Suche, Barcode-Scan, eigene Lebensmittel oder Schnelleintrag
 - Sport eintragen (Schätzung über Dauer und Gewicht) oder Wert aus Apple Health per Kurzbefehl einfügen
