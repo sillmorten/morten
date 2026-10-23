@@ -18,7 +18,8 @@ const todayKey = () => dkey(new Date());
 const WD = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
 const WDL = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
 const MON = ['Jan.', 'Feb.', 'März', 'Apr.', 'Mai', 'Juni', 'Juli', 'Aug.', 'Sep.', 'Okt.', 'Nov.', 'Dez.'];
-const shortDate = k => { const d = kdate(k); return `${WD[d.getDay()]}, ${pad(d.getDate())}.${pad(d.getMonth() + 1)}.`; };
+// Ältere Jahre bekommen die Jahreszahl dazu, z. B. „Fr, 29.08.25“
+const shortDate = k => { const d = kdate(k), y = d.getFullYear() !== new Date().getFullYear() ? String(d.getFullYear()).slice(2) : ''; return `${WD[d.getDay()]}, ${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${y}`; };
 const longDate = k => { const d = kdate(k); return `${WDL[d.getDay()]}, ${d.getDate()}. ${MON[d.getMonth()]}`; };
 const dayTitle = k => { const t = todayKey(); if (k === t) return 'Heute'; if (k === addDays(t, -1)) return 'Gestern'; if (k === addDays(t, 1)) return 'Morgen'; return WDL[kdate(k).getDay()]; };
 
@@ -28,7 +29,7 @@ const DONATE_URL = 'https://paypal.me/MortenUkena';
 // Verbesserungswünsche gehen über Formspree direkt an den Entwickler. Leer lassen, um den Eintrag auszublenden.
 const WISH_URL = 'https://formspree.io/f/xeepbyjn';
 // Versionsnummer für die Anzeige in der App. Bei jedem Update zusammen mit VERSION in sw.js hochzählen.
-const APP_VERSION = '1.2.1';
+const APP_VERSION = '1.3.0';
 const KEY = 'kalorien.v1';
 const DEFAULTS = () => ({
   v: 1, setup: false, name: '', greeted: false, goals: { kcal: 2500, c: 280, p: 150, f: 80 }, weightKg: 80, days: {}, foods: {}, weights: [], lastBackup: null,
@@ -104,7 +105,7 @@ const SPORTS = [
 /* ---------- Zustand der Oberfläche ---------- */
 let tab = 'today';
 let cur = todayKey();
-let histRange = 7;
+let histRange = 'week', histOff = 0;
 
 /* ---------- Toast ---------- */
 let toastT;
@@ -156,10 +157,11 @@ function viewToday() {
     <button class="navbtn" data-act="day" data-k="${prev}">${icon('left')}${WD[kdate(prev).getDay()]}</button>
     <div class="grp">
       ${isToday ? '' : `<button class="pillbtn" data-act="day" data-k="${todayKey()}">Heute</button><button class="navbtn" data-act="day" data-k="${next}">${WD[kdate(next).getDay()]}${icon('right')}</button>`}
+      <button class="circle" data-act="calendar" aria-label="Kalender">${icon('calendar')}</button>
       <button class="circle" data-act="add" aria-label="Lebensmittel hinzufügen">${icon('plus')}</button>
     </div>
   </header>
-  <h1 class="lt"><small>${longDate(cur)}</small>${dayTitle(cur)}</h1>
+  <h1 class="lt" data-act="calendar"><small>${longDate(cur)}${kdate(cur).getFullYear() !== new Date().getFullYear() ? ' ' + kdate(cur).getFullYear() : ''}</small>${dayTitle(cur)}</h1>
   ${isToday && S.name ? `<p class="greet">${greeting()}</p>` : ''}
   ${isToday ? streakPill() : ''}
   <section class="card hero">
@@ -206,53 +208,147 @@ function greeting() {
 
 /* ---------- Verlauf ---------- */
 function viewHistory() {
-  const t = todayKey(), N = histRange;
-  const keys = []; for (let i = N - 1; i >= 0; i--) keys.push(addDays(t, -i));
+  const t = todayKey(), P = period(), r = histRange;
+  const keys = []; for (let k = P.from; k <= P.to; k = addDays(k, 1)) keys.push(k);
   const rows = keys.map(k => ({ k, ...totals(k), has: !!S.days[k] && getDay(k).food.length > 0 }));
   const withData = rows.filter(r => r.has && r.k !== t);
   const base = withData.length ? withData : rows.filter(r => r.has);
   const avg = f => base.length ? base.reduce((a, r) => a + r[f], 0) / base.length : 0;
   const goal = S.goals.kcal;
-  const max = Math.max(goal * 1.15, ...rows.map(r => r.kcal)) || 1;
-  const label = (r, i) => N === 7 ? WD[kdate(r.k).getDay()] : (N === 30 ? (i % 7 === 0 ? kdate(r.k).getDate() + '.' : '') : (i % 30 === 0 ? MON[kdate(r.k).getMonth()] : ''));
-  const bars = rows.map((r, i) => {
-    const h = r.has ? Math.max(2, r.kcal / max * 100) : 2;
-    const cls = !r.has ? 'none' : (r.kcal > goal + r.burned ? 'over' : '') + (r.k === t ? ' today' : '');
-    return `<div class="col" data-act="openday" data-k="${r.k}"><i class="${cls}" style="height:${h}%"></i><em>${label(r, i)}</em></div>`;
-  }).join('');
+  // Bis 31 Tage ein Balken pro Tag, darüber ein Balken pro Monat (Durchschnitt der eingetragenen Tage)
+  let bars;
+  if (keys.length <= 31) {
+    bars = rows.map((x, i) => ({ act: 'openday', k: x.k, v: x.kcal, has: x.has, over: x.kcal > goal + x.burned, today: x.k === t,
+      l: keys.length <= 7 ? WD[kdate(x.k).getDay()] : (i % 7 === 0 ? kdate(x.k).getDate() + '.' : '') }));
+  } else {
+    const ms = {};
+    for (const x of rows) { const m = x.k.slice(0, 7); (ms[m] ||= { m, days: [] }); if (x.has && x.k !== t) ms[m].days.push(x); }
+    const list = Object.values(ms), step = Math.ceil(list.length / 12);
+    bars = list.map((g, i) => {
+      const v = g.days.length ? g.days.reduce((a, x) => a + x.kcal, 0) / g.days.length : 0;
+      const b = g.days.length ? g.days.reduce((a, x) => a + x.burned, 0) / g.days.length : 0;
+      const [y, m] = g.m.split('-').map(Number);
+      return { act: 'openmonth', k: g.m, v, has: g.days.length > 0, over: v > goal + b, today: false, l: i % step === 0 ? (list.length > 12 && m === 1 || i === 0 && list.length > 12 ? `${MON[m - 1]} ${String(y).slice(2)}` : MON[m - 1]) : '' };
+    });
+  }
+  const max = Math.max(goal * 1.15, ...bars.map(b => b.v)) || 1;
+  const barHtml = bars.map(b => `<div class="col" data-act="${b.act}" data-k="${b.k}"><i class="${!b.has ? 'none' : (b.over ? 'over' : '') + (b.today ? ' today' : '')}" style="height:${b.has ? Math.max(2, b.v / max * 100) : 2}%"></i><em>${b.l}</em></div>`).join('');
   const goalTop = (1 - goal / max) * 130; // 150px Höhe minus 20px Beschriftung
-  const days = rows.filter(r => r.has).reverse().slice(0, N === 7 ? 7 : 31).map(r =>
-    `<button class="it" data-act="openday" data-k="${r.k}"><div class="n"><b>${shortDate(r.k)}${r.k === t ? ' · heute' : ''}</b></div><span class="k num">${n0(r.kcal)} kcal · ${n0(r.p)} g Eiweiß</span><span class="chev">${icon('right')}</span></button>`).join('');
+  const logged = rows.filter(r => r.has).reverse();
+  let days = '';
+  if (r === 'week') days = logged.length ? `<section class="list">${logged.map(dayRow).join('')}</section>` : '';
+  else {
+    const byM = {}; for (const x of logged) (byM[x.k.slice(0, 7)] ||= []).push(x);
+    days = Object.entries(byM).map(([m, xs]) => { const [y, mm] = m.split('-').map(Number); return `<div class="hdr"><span>${MONL[mm - 1]} ${y}</span><span>${xs.length} ${xs.length === 1 ? 'Tag' : 'Tage'}</span></div><section class="list">${xs.map(dayRow).join('')}</section>`; }).join('');
+  }
   const lastW = S.weights.length ? S.weights[S.weights.length - 1] : null;
   const wDiff = weightDiff(30);
   const pAvg = avg('p');
   const backupAge = S.lastBackup ? Math.floor((Date.now() - S.lastBackup) / 864e5) : null;
   const hasAny = Object.keys(S.days).length > 0;
   const backupSub = S.lastBackup ? `Zuletzt gesichert am ${shortDate(dkey(new Date(S.lastBackup)))}` : 'Noch nie gesichert';
+  const canBack = r !== 'all' && P.from > firstDataKey(), canFwd = r !== 'all' && histOff > 0;
   return `
-  <header class="nav"></header>
+  <header class="nav"><span></span><button class="circle" data-act="calendar" aria-label="Kalender">${icon('calendar')}</button></header>
   <h1 class="lt">Verlauf</h1>
   <div class="seg" role="tablist">
-    ${[[7, 'Woche'], [30, 'Monat'], [90, '3 Monate']].map(([n, l]) => `<button class="${N === n ? 'on' : ''}" data-act="range" data-n="${n}">${l}</button>`).join('')}
+    ${[['week', 'Woche'], ['month', 'Monat'], ['year', 'Jahr'], ['all', 'Alles']].map(([n, l]) => `<button class="${r === n ? 'on' : ''}" data-act="range" data-n="${n}">${l}</button>`).join('')}
   </div>
   <section class="card">
-    <div class="ctop">Durchschnitt</div>
-    <div class="big"><b class="num">${base.length ? n0(avg('kcal')) : '–'}</b><span>kcal pro Tag</span></div>
-    <div class="range">${shortDate(keys[0])} – ${shortDate(keys[keys.length - 1])}</div>
-    <div class="chart" style="--gap:${N === 7 ? 10 : N === 30 ? 3 : 1}px">
-      <div class="goal" style="top:${goalTop.toFixed(0)}px"><span>Ziel ${n0(goal)}</span></div>${bars}
+    <div class="pnav">
+      <button class="xb" data-act="histStep" data-d="1" ${canBack ? '' : 'disabled'} aria-label="Zurück">${icon('left')}</button>
+      <div><b>${P.label}</b><span>${P.sub}</span></div>
+      <button class="xb" data-act="histStep" data-d="-1" ${canFwd ? '' : 'disabled'} aria-label="Weiter">${icon('right')}</button>
+    </div>
+    <div class="ctop" style="margin-top:12px">Durchschnitt</div>
+    <div class="big"><b class="num">${base.length ? n0(avg('kcal')) : '–'}</b><span>kcal pro Tag${base.length ? ` · ${base.length} ${base.length === 1 ? 'Tag' : 'Tage'} eingetragen` : ''}</span></div>
+    <div class="chart" style="--gap:${bars.length <= 7 ? 10 : bars.length <= 12 ? 6 : bars.length <= 31 ? 3 : 1}px">
+      <div class="goal" style="top:${goalTop.toFixed(0)}px"><span>Ziel ${n0(goal)}</span></div>${barHtml}
     </div>
   </section>
   <section class="list icons">
-    <div class="it">${tile('egg', ['#4ee37a', '#24b34b'])}<div class="n"><b>Eiweiß</b><span>${base.length ? `Ø ${n0(pAvg)} g · Ziel ${n0(S.goals.p)} g` : 'Noch keine Daten'}</span></div>${base.length && pAvg >= S.goals.p * .95 ? `<span style="color:var(--grn);font-size:22px">${icon('check')}</span>` : ''}</div>
-    <div class="it"><span class="ic" style="background:linear-gradient(180deg,#ffb340,#ff8a00)">${icon('bolt')}</span><div class="n"><b>Makros im Schnitt</b><span>${base.length ? `${n0(avg('c'))} g KH · ${n0(pAvg)} g Eiweiß · ${n0(avg('f'))} g Fett` : 'Noch keine Daten'}</span></div></div>
+    <div class="it">${tile('egg', ['#4ee37a', '#24b34b'])}<div class="n"><b>Eiweiß</b><span>${base.length ? `Ø ${n0(pAvg)} g · Ziel ${n0(S.goals.p)} g` : 'Keine Daten in diesem Zeitraum'}</span></div>${base.length && pAvg >= S.goals.p * .95 ? `<span style="color:var(--grn);font-size:22px">${icon('check')}</span>` : ''}</div>
+    <div class="it"><span class="ic" style="background:linear-gradient(180deg,#ffb340,#ff8a00)">${icon('bolt')}</span><div class="n"><b>Makros im Schnitt</b><span>${base.length ? `${n0(avg('c'))} g KH · ${n0(pAvg)} g Eiweiß · ${n0(avg('f'))} g Fett` : 'Keine Daten in diesem Zeitraum'}</span></div></div>
     <button class="it" data-act="weight">${tile('scales', ['#40a0ff', '#0a6fe0'])}<div class="n"><b>Körpergewicht</b><span>${lastW ? `${n1(lastW.kg)} kg${wDiff !== null ? ` · ${wDiff > 0 ? '+' : wDiff < 0 ? '−' : '±'}${n1(Math.abs(wDiff))} kg in 30 Tagen` : ''}` : 'Gewicht eintragen'}</span></div><span class="chev">${icon('right')}</span></button>
     <button class="it" data-act="body">${tile('ruler', ['#5ac8fa', '#1a9bd7'])}<div class="n"><b>Körpermaße & Fotos</b><span>${bodySub()}</span></div><span class="chev">${icon('right')}</span></button>
     <button class="it" data-act="badges">${tile('trophy', ['#ffd60a', '#f5a300'])}<div class="n"><b>Streaks & Abzeichen</b><span>${earnedCount()} von ${BADGES.length} Abzeichen</span></div><span class="chev">${icon('right')}</span></button>
     <button class="it" data-act="backup">${tile('cloud', backupAge !== null && backupAge < 30 || !hasAny ? ['#a1a1a6', '#6e6e73'] : ['#ffb340', '#ff8a00'])}<div class="n"><b>Backup</b><span>${backupSub}</span></div><span class="chev">${icon('right')}</span></button>
   </section>
-  ${days ? `<div class="hdr"><span>Tage</span></div><section class="list">${days}</section>` : `<p class="empty">Hier erscheinen deine Tage, sobald du etwas eingetragen hast.</p>`}`;
+  ${days ? (r === 'week' ? `<div class="hdr"><span>Tage</span></div>` : '') + days : `<p class="empty">${hasAny ? 'In diesem Zeitraum ist nichts eingetragen.' : 'Hier erscheinen deine Tage, sobald du etwas eingetragen hast.'}</p>`}`;
 }
+const dayRow = r => `<button class="it" data-act="openday" data-k="${r.k}"><div class="n"><b>${shortDate(r.k)}${r.k === todayKey() ? ' · heute' : ''}</b></div><span class="k num">${n0(r.kcal)} kcal · ${n0(r.p)} g Eiweiß</span><span class="chev">${icon('right')}</span></button>`;
+const MONL = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+// Frühester Tag mit Daten (Essen, Gewicht, Maße), damit man nicht ins Leere zurückblättert
+function firstDataKey() {
+  const ks = [...Object.keys(S.days), ...S.weights.map(w => w.date), ...S.body.map(b => b.date)].sort();
+  return ks[0] || todayKey();
+}
+const fmtD = k => { const d = kdate(k); return `${d.getDate()}.${d.getMonth() + 1}.`; };
+function period() {
+  const t = todayKey(), td = kdate(t), o = histOff;
+  if (histRange === 'week') {
+    const d = new Date(td); d.setDate(d.getDate() - (d.getDay() + 6) % 7 - 7 * o);
+    const from = dkey(d), to = addDays(from, 6);
+    const lbl = o === 0 ? 'Diese Woche' : o === 1 ? 'Letzte Woche' : `KW ${isoWeek(d)}`;
+    return { from, to, label: lbl, sub: `${fmtD(from)} – ${fmtD(to)}${kdate(to).getFullYear()}` };
+  }
+  if (histRange === 'month') {
+    const d = new Date(td.getFullYear(), td.getMonth() - o, 1), e = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+    return { from: dkey(d), to: dkey(e), label: `${MONL[d.getMonth()]} ${d.getFullYear()}`, sub: o === 0 ? 'Dieser Monat' : o === 1 ? 'Letzter Monat' : `${fmtD(dkey(d))} – ${fmtD(dkey(e))}` };
+  }
+  if (histRange === 'year') {
+    const y = td.getFullYear() - o;
+    return { from: `${y}-01-01`, to: `${y}-12-31`, label: String(y), sub: o === 0 ? 'Dieses Jahr' : o === 1 ? 'Letztes Jahr' : '1.1. – 31.12.' };
+  }
+  let from = firstDataKey(); if (from > addDays(t, -29)) from = addDays(t, -29);
+  from = from.slice(0, 7) + '-01';
+  return { from, to: t, label: 'Alles', sub: `Seit ${fmtD(from)}${kdate(from).getFullYear()}` };
+}
+function isoWeek(d) {
+  const x = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 3 - (d.getDay() + 6) % 7);
+  const w1 = new Date(x.getFullYear(), 0, 4);
+  return 1 + Math.round(((x - w1) / 864e5 - 3 + (w1.getDay() + 6) % 7) / 7);
+}
+
+/* ---------- Kalender ---------- */
+let calM = null;
+function openCalendar() {
+  const c = kdate(cur || todayKey()); calM = new Date(c.getFullYear(), c.getMonth(), 1);
+  openLayer('sheet', `<div id="calBody" style="display:flex;flex-direction:column;gap:14px"></div>`, el => {
+    const draw = () => {
+      const y = calM.getFullYear(), m = calM.getMonth(), t = todayKey();
+      const first = (calM.getDay() + 6) % 7, n = new Date(y, m + 1, 0).getDate();
+      const now = kdate(t), isNow = y === now.getFullYear() && m === now.getMonth();
+      const back = dkey(new Date(y, m, 0)) >= firstDataKey().slice(0, 8) + '01';
+      let cells = '', cnt = 0;
+      for (let i = 0; i < first; i++) cells += '<span></span>';
+      for (let d = 1; d <= n; d++) {
+        const k = `${y}-${pad(m + 1)}-${pad(d)}`, has = dayLogged(k);
+        if (has) cnt++;
+        const st = has ? (dayInGoal(k) ? 'g' : 'o') : '';
+        cells += `<button class="cd${k === t ? ' td' : ''}${k === cur ? ' sel' : ''}${k > t ? ' fut' : ''}" data-cal="${k}" ${k > t ? 'disabled' : ''}>${d}${st ? `<i class="${st}"></i>` : ''}</button>`;
+      }
+      $('#calBody', el).innerHTML = `
+        <div class="sh"><div class="t"><b>Kalender</b><span>Tippe auf einen Tag, um ihn anzusehen</span></div><button class="xb" data-act="close" aria-label="Schließen">${icon('x')}</button></div>
+        <section class="card cal">
+          <div class="pnav">
+            <button class="xb" data-cm="-1" ${back ? '' : 'disabled'} aria-label="Vorheriger Monat">${icon('left')}</button>
+            <div><b>${MONL[m]} ${y}</b><span>${cnt} ${cnt === 1 ? 'Tag' : 'Tage'} eingetragen</span></div>
+            <button class="xb" data-cm="1" ${isNow ? 'disabled' : ''} aria-label="Nächster Monat">${icon('right')}</button>
+          </div>
+          <div class="cgrid">${['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map(w => `<em>${w}</em>`).join('')}${cells}</div>
+          <div class="clegend"><span><i class="g"></i>Im Ziel</span><span><i class="o"></i>Eingetragen</span></div>
+        </section>
+        ${isNow ? '' : `<button class="btn sec" data-cm="0">Zu heute</button>`}`;
+      el.querySelectorAll('[data-cm]').forEach(b => b.addEventListener('click', () => {
+        const d = +b.dataset.cm; calM = d === 0 ? new Date(now.getFullYear(), now.getMonth(), 1) : new Date(y, m + d, 1); draw();
+      }));
+      el.querySelectorAll('[data-cal]').forEach(b => b.addEventListener('click', () => { cur = b.dataset.cal; tab = 'today'; closeAll(); render(); window.scrollTo(0, 0); }));
+    };
+    draw();
+  });
+}
+
 function weightDiff(daysBack) {
   const w = S.weights; if (w.length < 2) return null;
   const last = w[w.length - 1], from = addDays(last.date, -daysBack);
@@ -710,22 +806,27 @@ function openHealthHelp() {
 }
 
 /* ---------- Gewicht ---------- */
+let wRange = 90;
+// Einträge der letzten n Tage (0 = alle)
+const sinceDays = (list, n) => n ? list.filter(x => x.date >= addDays(todayKey(), -n)) : list;
+const rangeSeg = (cur, attr) => `<div class="seg">${[[90, '3 Monate'], [365, 'Jahr'], [0, 'Alles']].map(([n, l]) => `<button class="${cur === n ? 'on' : ''}" ${attr}="${n}">${l}</button>`).join('')}</div>`;
 function openWeight() {
   openLayer('sheet', `<div id="wBody" style="display:flex;flex-direction:column;gap:14px"></div>`, el => {
     const draw = () => {
-      const w = S.weights, last = w[w.length - 1];
+      const w = S.weights, last = w[w.length - 1], ws = sinceDays(w, wRange);
       $('#wBody', el).innerHTML = `
         <div class="sh"><div class="t"><b>Körpergewicht</b><span>${last ? `Zuletzt ${n1(last.kg)} kg am ${shortDate(last.date)}` : 'Noch kein Eintrag'}</span></div><button class="xb" data-act="close" aria-label="Schließen">${icon('x')}</button></div>
         <div class="amt"><input id="wk" inputmode="decimal" placeholder="${last ? n1(last.kg) : '80,0'}" aria-label="Gewicht in kg"><span>kg</span></div>
         <button class="btn" id="wOk">Für heute speichern</button>
-        ${w.length >= 2 ? `<section class="card wchart">${weightChart(w.slice(-90))}</section>` : ''}
-        ${w.length ? `<section class="list">${w.slice().reverse().slice(0, 30).map(x => `<div class="it"><div class="n"><b>${n1(x.kg)} kg</b><span>${shortDate(x.date)}</span></div><button class="xb" data-wdel="${x.date}" aria-label="Löschen" style="color:var(--red)">${icon('trash')}</button></div>`).join('')}</section>` : ''}`;
+        ${w.length >= 2 ? `${rangeSeg(wRange, 'data-wr')}<section class="card wchart">${ws.length >= 2 ? weightChart(ws) : '<p class="empty">Zu wenige Einträge in diesem Zeitraum.</p>'}</section>` : ''}
+        ${w.length ? `<div class="hdr"><span>Alle Einträge</span><span>${w.length}</span></div><section class="list">${w.slice().reverse().map(x => `<div class="it"><div class="n"><b>${n1(x.kg)} kg</b><span>${shortDate(x.date)}</span></div><button class="xb" data-wdel="${x.date}" aria-label="Löschen" style="color:var(--red)">${icon('trash')}</button></div>`).join('')}</section>` : ''}`;
       fitAmt($('#wk', el));
       $('#wOk', el).addEventListener('click', () => {
         const kg = num($('#wk', el).value); if (!(kg > 20 && kg < 400)) { toast('Bitte ein gültiges Gewicht eingeben'); return; }
         const t = todayKey(); S.weights = S.weights.filter(x => x.date !== t); S.weights.push({ date: t, kg }); S.weights.sort((a, b) => a.date.localeCompare(b.date));
         S.weightKg = kg; save(); buzz(); render(); draw(); toast('Gewicht gespeichert');
       });
+      el.querySelectorAll('[data-wr]').forEach(b => b.addEventListener('click', () => { wRange = +b.dataset.wr; draw(); }));
       el.querySelectorAll('[data-wdel]').forEach(b => b.addEventListener('click', () => { S.weights = S.weights.filter(x => x.date !== b.dataset.wdel); save(); render(); draw(); }));
     };
     draw();
@@ -940,7 +1041,7 @@ function bodySub() {
   if (!parts.length && S.body.length) parts.push(`Zuletzt ${shortDate(S.body[S.body.length - 1].date)}`);
   return parts.length ? parts.join(' · ') : 'Maße und Fotos nur auf dem iPhone';
 }
-let bodyEl = null, bodyMeasure = 'waist';
+let bodyEl = null, bodyMeasure = 'waist', bRange = 0;
 function openBody() {
   openLayer('page', `<div id="bodyBody" style="display:flex;flex-direction:column;gap:12px"></div>
     <input type="file" id="phFile" accept="image/*" hidden>`, el => {
@@ -972,9 +1073,9 @@ function drawBody() {
     <p class="foot">Fotos bleiben nur auf diesem iPhone. Sie werden verkleinert gespeichert und sind im Backup enthalten.</p>
     <div class="hdr"><span>Körpermaße</span></div>
     ${avail.length ? `<section class="list">${avail.map(m => { const s = series(m.id), l = s[s.length - 1]; return `<button class="it${m.id === bodyMeasure ? ' sel' : ''}" data-act="bodyMeasure" data-m="${m.id}"><div class="n"><b>${m.name}</b><span>${shortDate(l.date)}${diff(s, m)}</span></div><span class="k num">${n1(l[m.id])} ${m.unit}</span></button>`; }).join('')}</section>
-    ${sel.length >= 2 ? `<section class="card wchart"><div class="ctop">${selM.name}</div>${weightChart(sel.slice(-60), bodyMeasure, 'var(--tint)')}</section>` : ''}` : ''}
+    ${sel.length >= 2 ? `${rangeSeg(bRange, 'data-act="bodyRange" data-r')}<section class="card wchart"><div class="ctop">${selM.name}</div>${sinceDays(sel, bRange).length >= 2 ? weightChart(sinceDays(sel, bRange), bodyMeasure, 'var(--tint)') : '<p class="empty">Zu wenige Einträge in diesem Zeitraum.</p>'}</section>` : ''}` : ''}
     <button class="btn${avail.length ? ' sec' : ''} iconbtn" data-act="measure">${icon('ruler')}Maße eintragen</button>
-    ${S.body.length ? `<div class="hdr"><span>Einträge</span></div><section class="list">${S.body.slice().reverse().slice(0, 40).map(e => `<div class="it"><div class="n"><b>${shortDate(e.date)}</b><span>${esc(MEASURES.filter(m => e[m.id] > 0).map(m => `${m.name} ${n1(e[m.id])}`).join(' · '))}</span></div><button class="xb" data-bdel="${e.date}" aria-label="Löschen" style="color:var(--red)">${icon('trash')}</button></div>`).join('')}</section>` : `<p class="foot">Miss am besten morgens, nüchtern und immer an derselben Stelle. Taille: auf Höhe des Bauchnabels.</p>`}`;
+    ${S.body.length ? `<div class="hdr"><span>Einträge</span></div><section class="list">${S.body.slice().reverse().map(e => `<div class="it"><div class="n"><b>${shortDate(e.date)}</b><span>${esc(MEASURES.filter(m => e[m.id] > 0).map(m => `${m.name} ${n1(e[m.id])}`).join(' · '))}</span></div><button class="xb" data-bdel="${e.date}" aria-label="Löschen" style="color:var(--red)">${icon('trash')}</button></div>`).join('')}</section>` : `<p class="foot">Miss am besten morgens, nüchtern und immer an derselben Stelle. Taille: auf Höhe des Bauchnabels.</p>`}`;
   b.querySelectorAll('[data-bdel]').forEach(x => x.addEventListener('click', ev => {
     const btn = ev.currentTarget;
     if (!btn.dataset.sure) { btn.dataset.sure = 1; btn.style.background = 'color-mix(in srgb, var(--red) 20%, transparent)'; return; }
@@ -1202,6 +1303,7 @@ const ACT = {
   addPhoto: () => { const f = bodyEl && $('#phFile', bodyEl); if (f) f.click(); },
   measure: () => openMeasure(),
   bodyMeasure: b => { bodyMeasure = b.dataset.m; drawBody(); },
+  bodyRange: b => { bRange = +b.dataset.r; drawBody(); },
   suppToggle: b => {
     const id = b.dataset.id, l = S.suppLog[cur] || [];
     S.suppLog[cur] = l.includes(id) ? l.filter(x => x !== id) : [...l, id];
@@ -1211,7 +1313,10 @@ const ACT = {
   },
   backup: () => openBackup(),
   healthHelp: () => openHealthHelp(),
-  range: b => { histRange = +b.dataset.n; render(); },
+  range: b => { histRange = b.dataset.n; histOff = 0; render(); },
+  histStep: b => { histOff = Math.max(0, histOff + +b.dataset.d); render(); },
+  openmonth: b => { const [y, m] = b.dataset.k.split('-').map(Number), n = kdate(todayKey()); histRange = 'month'; histOff = (n.getFullYear() - y) * 12 + n.getMonth() - (m - 1); render(); window.scrollTo(0, 0); },
+  calendar: () => openCalendar(),
   kcalFromMacros: () => { const g = S.goals; g.kcal = Math.round(g.c * 4 + g.p * 4 + g.f * 9); save(); render(); toast('Kalorienziel angepasst'); },
   wipe: b => {
     if (!b.dataset.sure) { b.dataset.sure = 1; b.textContent = 'Wirklich alles löschen? Nochmal tippen'; setTimeout(() => { if (b.isConnected) { delete b.dataset.sure; b.textContent = 'Alle Daten löschen'; } }, 4000); return; }

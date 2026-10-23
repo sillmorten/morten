@@ -9,7 +9,8 @@ Alle Daten bleiben lokal auf dem Gerät (localStorage). Lebensmittel kommen von
 - Über 180 eingebaute Alltags-Lebensmittel mit Portionsgrößen (funktionieren offline)
 - Eintragen per Suche, Barcode-Scan, eigene Lebensmittel oder Schnelleintrag
 - Sport eintragen (Schätzung über Dauer und Gewicht) oder Wert aus Apple Health per Kurzbefehl einfügen
-- Verlauf (Woche, Monat, 3 Monate), Körpergewicht, Backup als Datei
+- Verlauf nach Woche, Monat, Jahr oder alles, beliebig weit zurückblättern, Kalender zum Springen auf jeden Tag
+- Körpergewicht mit komplettem Verlauf, Backup als Datei
 - Streaks und Abzeichen (Tage im Ziel, Tage eingetragen, Eiweiß, Supplements)
 - Körpermaße mit Verlauf und Fortschrittsfotos (verkleinert in IndexedDB, im Backup enthalten)
 - Supplement-Tracker zum täglichen Abhaken, frei einstellbar
