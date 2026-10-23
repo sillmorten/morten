@@ -1,5 +1,5 @@
 // Offline-Cache: App-Dateien kommen aus dem Cache und werden im Hintergrund aktualisiert.
-const VERSION = 'biss-v17';
+const VERSION = 'biss-v18';
 const ASSETS = ['./', 'index.html', 'styles.css', 'app.js', 'icons.js', 'foods.js', 'vendor/zxing.min.js', 'manifest.webmanifest', 'icons/icon-32.png', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/qr.png'];
 
 self.addEventListener('install', e => {
@@ -12,7 +12,9 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   const req = e.request;
-  if (req.method !== 'GET' || new URL(req.url).origin !== location.origin) return;
+  const url = new URL(req.url);
+  // status.json (Sperre) immer frisch aus dem Netz
+  if (req.method !== 'GET' || url.origin !== location.origin || url.pathname.endsWith('/status.json')) return;
   e.respondWith(caches.open(VERSION).then(async cache => {
     const key = req.mode === 'navigate' ? './' : req;
     const cached = await cache.match(key, { ignoreSearch: true });

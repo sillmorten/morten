@@ -27,3 +27,8 @@ Reines HTML/CSS/JavaScript ohne Build-Schritt. `sw.js` cached die App für den O
 Nach Änderungen die `VERSION` in `sw.js` hochzählen, damit Geräte das Update laden, und `APP_VERSION` in `app.js` anpassen (wird unter „Ziele“ angezeigt).
 
 Icons: [Phosphor Icons](https://phosphoricons.com) (MIT). Barcode: [ZXing](https://github.com/zxing-js/library) (Apache 2.0).
+
+## App sperren
+In `status.json` steuert `"gesperrt": true` einen Sperr-Bildschirm für alle Nutzer, `false` gibt die App wieder frei.
+Titel und Text lassen sich dort ebenfalls ändern. Die Daten auf den Geräten bleiben unberührt.
+Auf dem eigenen Gerät hebt 7× Tippen aufs Icon im Sperr-Bildschirm die Sperre dauerhaft auf.

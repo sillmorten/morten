@@ -307,3 +307,7 @@ i.o { background: var(--org); }
 .calcres .eta b { color: var(--tint); }
 .calcres .eta span { display: block; font-size: 13px; color: var(--l2); margin-top: 2px; }
 #cAct .chk.on { background: var(--tint); border-color: var(--tint); }
+
+/* Sperr-Bildschirm */
+#lock { position: fixed; inset: 0; z-index: 100; background: var(--bg); display: flex; align-items: center; justify-content: center; padding: 24px; padding-top: calc(env(safe-area-inset-top, 0px) + 24px); padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 24px); }
+#lock .hello-ic { width: 96px; height: 96px; border-radius: 22px; margin-bottom: 8px; -webkit-tap-highlight-color: transparent; }

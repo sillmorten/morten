@@ -29,7 +29,7 @@ const DONATE_URL = 'https://paypal.me/MortenUkena';
 // Verbesserungswünsche gehen über Formspree direkt an den Entwickler. Leer lassen, um den Eintrag auszublenden.
 const WISH_URL = 'https://formspree.io/f/xeepbyjn';
 // Versionsnummer für die Anzeige in der App. Bei jedem Update zusammen mit VERSION in sw.js hochzählen.
-const APP_VERSION = '1.5.0';
+const APP_VERSION = '1.6.0';
 const KEY = 'kalorien.v1';
 const DEFAULTS = () => ({
   v: 1, setup: false, name: '', greeted: false, goals: { kcal: 2500, c: 280, p: 150, f: 80 }, weightKg: 80, days: {}, foods: {}, weights: [], lastBackup: null,
@@ -1548,6 +1548,40 @@ document.addEventListener('visibilitychange', () => {
   const t = todayKey();
   if (t !== lastSeenDay) { if (cur === lastSeenDay) cur = t; lastSeenDay = t; render(); }
 });
+
+/* ---------- Sperre ---------- */
+// status.json im Repo steuert, ob die App gesperrt ist ("gesperrt": true/false).
+// Der letzte bekannte Stand wird gemerkt, damit die Sperre auch offline gilt. Die Daten bleiben unberührt.
+const LOCK_KEY = 'biss.lock', OWNER_KEY = 'biss.owner';
+const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* egal */ } };
+function showLock(st) {
+  let el = $('#lock');
+  if (!st || !st.gesperrt || lsGet(OWNER_KEY) === '1') { if (el) el.remove(); return; }
+  if (!el) { el = document.createElement('div'); el.id = 'lock'; el.setAttribute('role', 'alertdialog'); document.body.appendChild(el); }
+  el.innerHTML = `<div class="hello">
+      <img src="icons/icon-192.png" alt="" class="hello-ic" id="lockIc">
+      <h2>${esc(st.titel || 'Biss ist gerade gesperrt')}</h2>
+      <p>${esc(st.text || 'Die App wird bald wieder freigegeben. Deine Daten bleiben erhalten.')}</p>
+    </div>`;
+  // Für den Besitzer: 7× aufs Icon tippen hebt die Sperre auf diesem Gerät auf
+  let taps = 0, tT;
+  $('#lockIc', el).addEventListener('click', () => {
+    clearTimeout(tT); tT = setTimeout(() => { taps = 0; }, 2000);
+    if (++taps >= 7) { lsSet(OWNER_KEY, '1'); el.remove(); toast('Sperre auf diesem Gerät aufgehoben'); }
+  });
+}
+async function checkLock() {
+  try {
+    const r = await fetch('status.json?t=' + Date.now(), { cache: 'no-store' });
+    if (!r.ok) return;
+    const st = await r.json();
+    lsSet(LOCK_KEY, JSON.stringify(st)); showLock(st);
+  } catch (e) { /* offline: letzter Stand gilt */ }
+}
+try { showLock(JSON.parse(lsGet(LOCK_KEY) || 'null')); } catch (e) { /* kein Stand */ }
+checkLock();
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkLock(); });
 
 /* ---------- Start ---------- */
 if (!S.badges) { initBadges(); save(); }
