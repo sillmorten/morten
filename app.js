@@ -25,10 +25,10 @@ const dayTitle = k => { const t = todayKey(); if (k === t) return 'Heute'; if (k
 /* ---------- Daten ---------- */
 // Spendenlink (PayPal.me). Leer lassen, um den Eintrag auszublenden.
 const DONATE_URL = 'https://paypal.me/MortenUkena';
-// Verbesserungswünsche gehen per Mail an diese Adresse. Leer lassen, um den Eintrag auszublenden.
-const WISH_MAIL = 'info@sill-media.de';
+// Verbesserungswünsche gehen über Formspree direkt an den Entwickler. Leer lassen, um den Eintrag auszublenden.
+const WISH_URL = 'https://formspree.io/f/xeepbyjn';
 // Versionsnummer für die Anzeige in der App. Bei jedem Update zusammen mit VERSION in sw.js hochzählen.
-const APP_VERSION = '1.2.0';
+const APP_VERSION = '1.2.1';
 const KEY = 'kalorien.v1';
 const DEFAULTS = () => ({
   v: 1, setup: false, name: '', greeted: false, goals: { kcal: 2500, c: 280, p: 150, f: 80 }, weightKg: 80, days: {}, foods: {}, weights: [], lastBackup: null,
@@ -287,7 +287,7 @@ function viewGoals() {
     <button class="it" data-act="healthHelp">${tile('heart', ['#ff5c7c', '#e8264d'])}<div class="n"><b>Apple Health verbinden</b><span>Verbrannte Kalorien per Kurzbefehl</span></div><span class="chev">${icon('right')}</span></button>
     <button class="it" data-act="ownFoods">${tile('pencil', ['#a1a1a6', '#6e6e73'])}<div class="n"><b>Eigene Lebensmittel</b><span>${Object.values(S.foods).length} gespeichert</span></div><span class="chev">${icon('right')}</span></button>
   </section>
-  ${WISH_MAIL ? `<div class="hdr"><span>Feedback</span></div>
+  ${WISH_URL ? `<div class="hdr"><span>Feedback</span></div>
   <section class="list icons"><button class="it" data-act="wish">${tile('sparkle', ['#ffd60a', '#f5a300'])}<div class="n"><b>Wunsch senden 💡</b><span>Was fehlt dir? Sag’s dem Entwickler</span></div><span class="chev">${icon('right')}</span></button></section>` : ''}
   ${DONATE_URL ? `<div class="hdr"><span>Unterstützen</span></div>
   <section class="list icons"><a class="it" href="${esc(DONATE_URL)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">${tile('paypal', ['#009cde', '#003087'])}<div class="n"><b>Entwickler unterstützen ☕</b><span>Freiwillige Spende per PayPal</span></div><span class="chev">${icon('right')}</span></a></section>` : ''}
@@ -1000,19 +1000,37 @@ function openMeasure() {
 }
 
 /* ---------- Verbesserungswunsch ---------- */
+let wishDraft = '';
 function openWish() {
-  openLayer('sheet', `
-    <div class="sh"><div class="t"><b>Wunsch senden 💡</b><span>Geht direkt an den Entwickler</span></div><button class="xb" data-act="close" aria-label="Schließen">${icon('x')}</button></div>
-    <textarea id="wishTxt" class="ta" rows="6" maxlength="2000" placeholder="Was soll die App noch können? Was nervt dich?" autocapitalize="sentences"></textarea>
-    <button class="btn" id="wishOk">Per Mail senden</button>
-    <p class="note">Danach öffnet sich deine Mail-App mit dem fertigen Text. Du musst nur noch auf Senden tippen.</p>`, el => {
-    setTimeout(() => $('#wishTxt', el).focus(), 350);
-    $('#wishOk', el).addEventListener('click', () => {
-      const txt = $('#wishTxt', el).value.trim();
-      if (!txt) { toast('Schreib kurz, was du dir wünschst'); return; }
-      const body = `${txt}\n\n--\n${S.name ? `Von: ${S.name}\n` : ''}Biss Version ${APP_VERSION}`;
-      location.href = `mailto:${WISH_MAIL}?subject=${encodeURIComponent('Biss – Verbesserungswunsch' + (S.name ? ' von ' + S.name : ''))}&body=${encodeURIComponent(body)}`;
-      closeTop(); toast('Danke für deinen Wunsch! 🙌');
+  openLayer('sheet', `<div id="wishBody" style="display:flex;flex-direction:column;gap:14px"></div>`, el => {
+    const body = $('#wishBody', el);
+    body.innerHTML = `
+      <div class="sh"><div class="t"><b>Wunsch senden 💡</b><span>Geht direkt an den Entwickler</span></div><button class="xb" data-act="close" aria-label="Schließen">${icon('x')}</button></div>
+      <textarea id="wishTxt" class="ta" rows="6" maxlength="2000" placeholder="Was soll die App noch können? Was nervt dich?" autocapitalize="sentences">${esc(wishDraft)}</textarea>
+      <button class="btn" id="wishOk">Absenden</button>
+      <p class="note">Mitgeschickt werden nur dein Text, dein Name${S.name ? ` (${esc(S.name)})` : ''} und die App-Version. Deine Essens- und Körperdaten bleiben auf dem iPhone.</p>`;
+    const ta = $('#wishTxt', el), ok = $('#wishOk', el);
+    setTimeout(() => ta.focus(), 350);
+    ta.addEventListener('input', () => { wishDraft = ta.value; });
+    ok.addEventListener('click', async () => {
+      const txt = ta.value.trim();
+      if (!txt) { toast('Schreib kurz, was du dir wünschst'); ta.focus(); return; }
+      if (!navigator.onLine) { toast('Kein Internet. Dein Text bleibt hier, versuch es später nochmal.'); return; }
+      ok.disabled = true; ok.textContent = 'Wird gesendet …';
+      const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 15000);
+      try {
+        const r = await fetch(WISH_URL, {
+          method: 'POST', signal: ctl.signal,
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({ name: S.name || 'Ohne Namen', message: txt, version: APP_VERSION, _subject: 'Biss – Verbesserungswunsch' + (S.name ? ' von ' + S.name : '') }),
+        });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        wishDraft = ''; buzz(); clearTimeout(toastT); $('#toast').classList.remove('show');
+        body.innerHTML = `<div class="hello"><div style="font-size:56px;line-height:1.1">🙌</div><h2>Danke${S.name ? ', ' + esc(S.name) : ''}!</h2><p>Dein Wunsch ist angekommen. Vielleicht steckt er schon im nächsten Update.</p></div><button class="btn" data-act="close">Fertig</button>`;
+      } catch (e) {
+        ok.disabled = false; ok.textContent = 'Nochmal versuchen';
+        toast(navigator.onLine ? 'Senden hat nicht geklappt. Versuch es gleich nochmal.' : 'Kein Internet. Versuch es später nochmal.');
+      } finally { clearTimeout(t); }
     });
   });
 }
