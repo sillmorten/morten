@@ -29,7 +29,7 @@ const DONATE_URL = 'https://paypal.me/MortenUkena';
 // Verbesserungswünsche gehen über Formspree direkt an den Entwickler. Leer lassen, um den Eintrag auszublenden.
 const WISH_URL = 'https://formspree.io/f/xeepbyjn';
 // Versionsnummer für die Anzeige in der App. Bei jedem Update zusammen mit VERSION in sw.js hochzählen.
-const APP_VERSION = '1.10.0';
+const APP_VERSION = '1.11.0';
 const KEY = 'kalorien.v1';
 const DEFAULTS = () => ({
   v: 1, setup: false, name: '', points: 0, usedCodes: [], greeted: false, goals: { kcal: 2500, c: 280, p: 150, f: 80 }, weightKg: 80, days: {}, foods: {}, weights: [], lastBackup: null,
@@ -699,12 +699,21 @@ function refreshOwnFoods() {
 }
 
 /* ---------- Barcode-Scanner ---------- */
-let scanner = null;
-async function openScanner() {
-  if (!navigator.mediaDevices?.getUserMedia) { manualBarcode(); return; }
-  const el = document.createElement('div'); el.className = 'scanner';
-  el.innerHTML = `<video playsinline muted autoplay></video><div class="scanframe"></div><div class="scantext">Barcode in den Rahmen halten</div>
-    <button class="scanclose" aria-label="Schließen">${icon('x')}</button><button class="scanmanual">Nummer eintippen</button>`;
+let scanner = null, zxingP = null;
+// ZXing erst laden, wenn die Kamera gebraucht wird
+function loadZXing() {
+  if (window.ZXing) return Promise.resolve();
+  return zxingP ||= new Promise((ok, no) => {
+    const sc = document.createElement('script'); sc.src = 'vendor/zxing.min.js';
+    sc.onload = ok; sc.onerror = () => { zxingP = null; no(new Error('ZXing')); }; document.head.appendChild(sc);
+  });
+}
+// qr: QR-Codes (Zugangs- und Punkte-Codes) statt Barcodes auf Verpackungen
+async function openScanner({ qr = false, text, onCode = handleBarcode, onManual = manualBarcode, manualLabel = 'Nummer eintippen' } = {}) {
+  if (!navigator.mediaDevices?.getUserMedia) { onManual(); return; }
+  const el = document.createElement('div'); el.className = 'scanner' + (qr ? ' qr' : '');
+  el.innerHTML = `<video playsinline muted autoplay></video><div class="scanframe"></div><div class="scantext">${esc(text || (qr ? 'QR-Code in den Rahmen halten' : 'Barcode in den Rahmen halten'))}</div>
+    <button class="scanclose" aria-label="Schließen">${icon('x')}</button><button class="scanmanual">${esc(manualLabel)}</button>`;
   document.body.appendChild(el);
   const video = $('video', el);
   const stop = () => {
@@ -715,22 +724,31 @@ async function openScanner() {
   };
   scanner = { stop, reader: null, done: false };
   $('.scanclose', el).addEventListener('click', stop);
-  $('.scanmanual', el).addEventListener('click', () => { stop(); manualBarcode(); });
+  $('.scanmanual', el).addEventListener('click', () => { stop(); onManual(); });
   try {
+    await loadZXing();
+    if (!scanner) return;
     const hints = new Map();
-    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [ZXing.BarcodeFormat.EAN_13, ZXing.BarcodeFormat.EAN_8, ZXing.BarcodeFormat.UPC_A, ZXing.BarcodeFormat.UPC_E]);
+    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, qr ? [ZXing.BarcodeFormat.QR_CODE] : [ZXing.BarcodeFormat.EAN_13, ZXing.BarcodeFormat.EAN_8, ZXing.BarcodeFormat.UPC_A, ZXing.BarcodeFormat.UPC_E]);
     const reader = new ZXing.BrowserMultiFormatReader(hints, 250);
     scanner.reader = reader;
     await reader.decodeFromConstraints({ audio: false, video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } }, video, res => {
       if (!res || !scanner || scanner.done) return;
       scanner.done = true; buzz();
-      const code = res.getText(); stop(); handleBarcode(code);
+      const code = res.getText(); stop(); onCode(code);
     });
   } catch (e) {
     stop();
     toast(e && e.name === 'NotAllowedError' ? 'Kein Kamerazugriff. Erlaube die Kamera in den Einstellungen.' : 'Kamera konnte nicht gestartet werden');
-    manualBarcode();
+    onManual();
   }
+}
+// QR-Code als SVG (für Punkte-Codes zum Abscannen)
+async function qrSvg(text) {
+  await loadZXing();
+  const svg = new ZXing.BrowserQRCodeSvgWriter().write(text, 220, 220);
+  svg.setAttribute('viewBox', `0 0 220 220`); svg.style.cssText = 'width:200px;height:200px;display:block;margin:0 auto';
+  return svg.outerHTML;
 }
 function manualBarcode() {
   openLayer('sheet', `
@@ -1244,7 +1262,7 @@ function openPoints() {
         <div class="hello"><div style="font-size:56px;line-height:1.1">${b ? b.name.slice(-2) : '🏆'}</div><h2 class="num">${n0(S.points || 0)} Punkte</h2>
           <p>${b ? b.name : 'Noch kein Abzeichen'}${next ? ` · noch ${n0(next[0] - (S.points || 0))} bis ${next[1]}` : ''}</p></div>
         <section class="list"><div class="row-in"><input id="ptCode" class="wide" style="text-align:left;text-transform:uppercase" placeholder="Code, z. B. P100-AB3C-XY7Z9" autocapitalize="characters" autocomplete="off" spellcheck="false" enterkeyhint="done" aria-label="Punkte-Code"></div></section>
-        <button class="btn" id="ptOk">Code einlösen</button>
+        <div style="display:flex;gap:10px"><button class="btn" id="ptScan" style="background:var(--g2);color:var(--tint)">📷 Scannen</button><button class="btn" id="ptOk">Einlösen</button></div>
         <p class="note">So gibt’s Punkte: Freunde tragen beim ersten Start <b>${esc(S.name || 'deinen Namen')}</b> als Empfehlung ein. Du bekommst dann vom Entwickler einen Code.</p>`;
       const inp = $('#ptCode', el);
       const go = () => {
@@ -1253,6 +1271,7 @@ function openPoints() {
         buzz(); confetti(); render(); draw(); toast(`+${n0(r.pts)} Punkte 🏆`);
       };
       $('#ptOk', el).addEventListener('click', go);
+      $('#ptScan', el).addEventListener('click', () => openScanner({ qr: true, text: 'Punkte-Code in den Rahmen halten', manualLabel: 'Doch eintippen', onManual: () => inp.focus(), onCode: c => { inp.value = c; go(); } }));
       inp.addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); go(); } });
     };
     draw();
@@ -1276,7 +1295,8 @@ function openGivePoints() {
       if (!name) { toast('Für wen ist der Code?'); $('#gpName', el).focus(); return; }
       const code = makeCode(name, pts);
       const msg = `Hey ${name}, danke fürs Weiterempfehlen! Du bekommst ${pts} Biss-Punkte 🏆\nÖffne Biss → Ziele → Meine Punkte und gib diesen Code ein:\n${code}`;
-      $('#gpOut', el).innerHTML = `<section class="card" style="text-align:center"><div class="note" style="margin-bottom:6px">Code für ${esc(name)}</div><div style="font-size:24px;font-weight:700;letter-spacing:.04em;user-select:all">${code}</div></section>`;
+      $('#gpOut', el).innerHTML = `<section class="card" style="text-align:center"><div class="note" style="margin-bottom:6px">Code für ${esc(name)} · zum Abscannen oder Abtippen</div><div id="gpQr" style="background:#fff;border-radius:12px;padding:8px;margin:4px auto 8px;width:fit-content"></div><div style="font-size:24px;font-weight:700;letter-spacing:.04em;user-select:all">${code}</div></section>`;
+      qrSvg(code).then(h => { const q = $('#gpQr', el); if (q) q.innerHTML = h; }).catch(() => { const q = $('#gpQr', el); if (q) q.remove(); });
       try { if (navigator.share) { await navigator.share({ text: msg }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
       try { await navigator.clipboard.writeText(msg); toast('Nachricht kopiert'); } catch (e) { /* Code steht ja da */ }
     });
@@ -1672,7 +1692,7 @@ function showLock(st) {
         <span class="lk-badge" id="lockBadge"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 10V7a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><rect x="5" y="10" width="14" height="11" rx="3" fill="currentColor"/></svg></span></div>
       <h2 class="lk-in" style="animation-delay:.25s">${esc(st.titel || 'Biss ist gerade gesperrt')}</h2>
       <p class="lk-in" style="animation-delay:.4s">${esc(st.text || 'Die App wird bald wieder freigegeben. Deine Daten bleiben erhalten.')}</p>
-      <form class="lk-code lk-in" id="lockForm" style="animation-delay:.5s" autocomplete="off"><input id="lockCode" type="text" placeholder="Zugangscode" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="go" aria-label="Zugangscode"><button type="submit">Öffnen</button></form>
+      <form class="lk-code lk-in" id="lockForm" style="animation-delay:.5s" autocomplete="off"><input id="lockCode" type="text" placeholder="Zugangscode" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="go" aria-label="Zugangscode"><button type="button" class="lk-scan" id="lockScan" aria-label="Code scannen">📷</button><button type="submit">Öffnen</button></form>
       <div class="lk-game lk-in" style="animation-delay:.55s"><b id="lockReps">0</b><span>Wiederholungen</span><small id="lockBest">${best ? `Rekord: ${best}` : 'Tipp aufs Icon und stemm die Hantel 💪'}</small></div>
     </div>`;
   // Minispiel: jedes Tippen aufs Icon ist eine Wiederholung
@@ -1700,6 +1720,8 @@ function showLock(st) {
       toast('Falscher Code'); inp.select();
     }
   });
+  $('#lockScan', el).addEventListener('click', () => openScanner({ qr: true, text: 'Zugangscode in den Rahmen halten', manualLabel: 'Doch eintippen', onManual: () => $('#lockCode', el).focus(),
+    onCode: c => { $('#lockCode', el).value = c; $('#lockForm', el).requestSubmit(); } }));
   // Für den Besitzer: 7× aufs Schloss tippen hebt die Sperre auf diesem Gerät auf
   let taps = 0, tT;
   $('#lockBadge', el).addEventListener('click', () => {
