@@ -29,7 +29,7 @@ const DONATE_URL = 'https://paypal.me/MortenUkena';
 // Verbesserungswünsche gehen über Formspree direkt an den Entwickler. Leer lassen, um den Eintrag auszublenden.
 const WISH_URL = 'https://formspree.io/f/xeepbyjn';
 // Versionsnummer für die Anzeige in der App. Bei jedem Update zusammen mit VERSION in sw.js hochzählen.
-const APP_VERSION = '1.8.0';
+const APP_VERSION = '1.9.0';
 const KEY = 'kalorien.v1';
 const DEFAULTS = () => ({
   v: 1, setup: false, name: '', points: 0, usedCodes: [], greeted: false, goals: { kcal: 2500, c: 280, p: 150, f: 80 }, weightKg: 80, days: {}, foods: {}, weights: [], lastBackup: null,
@@ -1642,13 +1642,16 @@ document.addEventListener('visibilitychange', () => {
 /* ---------- Sperre ---------- */
 // status.json im Repo steuert, ob die App gesperrt ist ("gesperrt": true/false).
 // Der letzte bekannte Stand wird gemerkt, damit die Sperre auch offline gilt. Die Daten bleiben unberührt.
-const LOCK_KEY = 'biss.lock', OWNER_KEY = 'biss.owner';
+const LOCK_KEY = 'biss.lock', OWNER_KEY = 'biss.owner', ACCESS_KEY = 'biss.access';
+// SHA-256 des Zugangscodes (klein geschrieben). Neuer Code = neuer Hash, dann sind alle Geräte wieder gesperrt.
+const ACCESS_HASH = '73887ad2ebd766a3876b21123636213a62ffd820ab061a7b5a5c6180c693305b';
+async function sha256(t) { const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(t)); return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, '0')).join(''); }
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* egal */ } };
 let lockSig = '';
 function showLock(st) {
   let el = $('#lock');
-  if (!st || !st.gesperrt || lsGet(OWNER_KEY) === '1') { if (el) el.remove(); lockSig = ''; return; }
+  if (!st || !st.gesperrt || lsGet(OWNER_KEY) === '1' || lsGet(ACCESS_KEY) === ACCESS_HASH) { if (el) el.remove(); lockSig = ''; return; }
   const sig = JSON.stringify(st);
   if (el && sig === lockSig) return; // nichts geändert: Spiel und Animation nicht neu starten
   lockSig = sig;
@@ -1661,6 +1664,7 @@ function showLock(st) {
         <span class="lk-badge" id="lockBadge"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 10V7a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><rect x="5" y="10" width="14" height="11" rx="3" fill="currentColor"/></svg></span></div>
       <h2 class="lk-in" style="animation-delay:.25s">${esc(st.titel || 'Biss ist gerade gesperrt')}</h2>
       <p class="lk-in" style="animation-delay:.4s">${esc(st.text || 'Die App wird bald wieder freigegeben. Deine Daten bleiben erhalten.')}</p>
+      <form class="lk-code lk-in" id="lockForm" style="animation-delay:.5s" autocomplete="off"><input id="lockCode" type="text" placeholder="Zugangscode" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="go" aria-label="Zugangscode"><button type="submit">Öffnen</button></form>
       <div class="lk-game lk-in" style="animation-delay:.55s"><b id="lockReps">0</b><span>Wiederholungen</span><small id="lockBest">${best ? `Rekord: ${best}` : 'Tipp aufs Icon und stemm die Hantel 💪'}</small></div>
     </div>`;
   // Minispiel: jedes Tippen aufs Icon ist eine Wiederholung
@@ -1674,6 +1678,19 @@ function showLock(st) {
     plus.style.left = (ev.offsetX || 52) + 'px'; wrap.appendChild(plus); setTimeout(() => plus.remove(), 700);
     if (reps > rec) { rec = reps; lsSet('biss.reps', String(rec)); bestEl.textContent = `Neuer Rekord: ${rec} 🎉`; }
     if (CHEER[reps]) { toast(CHEER[reps]); buzz(); }
+  });
+  // Zugangscode: richtiger Code schaltet dieses Gerät frei
+  $('#lockForm', el).addEventListener('submit', async ev => {
+    ev.preventDefault();
+    const inp = $('#lockCode', el), code = inp.value.trim().toLowerCase();
+    if (!code) { inp.focus(); return; }
+    if (await sha256(code) === ACCESS_HASH) {
+      lsSet(ACCESS_KEY, ACCESS_HASH); inp.blur(); buzz();
+      el.classList.add('lk-out'); setTimeout(() => { el.remove(); lockSig = ''; confetti(); toast('Willkommen in Biss! 🎉'); render(); }, 450);
+    } else {
+      const f = $('#lockForm', el); f.classList.remove('lk-no'); void f.offsetWidth; f.classList.add('lk-no');
+      toast('Falscher Code'); inp.select();
+    }
   });
   // Für den Besitzer: 7× aufs Schloss tippen hebt die Sperre auf diesem Gerät auf
   let taps = 0, tT;

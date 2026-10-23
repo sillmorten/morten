@@ -326,7 +326,7 @@ i.o { background: var(--org); }
 @keyframes lkUp { from { opacity: 0; transform: translateY(14px); } }
 #lock { overflow: hidden; }
 #lock .hello { position: relative; z-index: 1; }
-.lk-float { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+.lk-float { position: absolute; inset: 0; z-index: -1; pointer-events: none; }
 .lk-float span { position: absolute; bottom: -60px; opacity: .4; animation: lkRise linear infinite; }
 @keyframes lkRise { to { transform: translateY(calc(-100vh - 120px)) rotate(40deg); } }
 .lk-badge { cursor: pointer; -webkit-tap-highlight-color: transparent; }
@@ -335,6 +335,13 @@ i.o { background: var(--org); }
 @keyframes lkRep { 40% { transform: scale(.86) translateY(6px); } 70% { transform: scale(1.08) translateY(-10px); } }
 .lk-plus { position: absolute; top: -6px; font-weight: 800; font-size: 20px; color: var(--tint); pointer-events: none; animation: lkPlus .7s ease-out forwards; }
 @keyframes lkPlus { to { opacity: 0; transform: translateY(-46px); } }
+.lk-code { display: flex; gap: 8px; margin-top: 18px; width: min(320px, 86vw); }
+.lk-code input { flex: 1; min-width: 0; font: inherit; font-size: 17px; color: var(--l1); background: var(--g1); border: 0; border-radius: 14px; padding: 12px 14px; box-shadow: 0 2px 10px rgba(0,0,0,.06); text-align: center; letter-spacing: .04em; }
+.lk-code button { background: var(--tint); color: #fff; font-weight: 600; font-size: 17px; border-radius: 14px; padding: 0 18px; }
+.lk-code.lk-no { animation: lkNo .4s ease-in-out; }
+@keyframes lkNo { 20%, 60% { transform: translateX(-10px); } 40%, 80% { transform: translateX(10px); } }
+#lock.lk-out { animation: lkOut .45s ease-in forwards; }
+@keyframes lkOut { to { opacity: 0; transform: scale(1.08); } }
 .lk-game { margin-top: 18px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
 .lk-game b { font-size: 40px; font-weight: 800; line-height: 1; color: var(--tint); font-variant-numeric: tabular-nums; }
 .lk-game span { font-size: 13px; color: var(--l2); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
