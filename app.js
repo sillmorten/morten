@@ -29,7 +29,7 @@ const DONATE_URL = 'https://paypal.me/MortenUkena';
 // Verbesserungswünsche gehen über Formspree direkt an den Entwickler. Leer lassen, um den Eintrag auszublenden.
 const WISH_URL = 'https://formspree.io/f/xeepbyjn';
 // Versionsnummer für die Anzeige in der App. Bei jedem Update zusammen mit VERSION in sw.js hochzählen.
-const APP_VERSION = '1.9.0';
+const APP_VERSION = '1.9.1';
 const KEY = 'kalorien.v1';
 const DEFAULTS = () => ({
   v: 1, setup: false, name: '', points: 0, usedCodes: [], greeted: false, goals: { kcal: 2500, c: 280, p: 150, f: 80 }, weightKg: 80, days: {}, foods: {}, weights: [], lastBackup: null,
@@ -395,6 +395,8 @@ function viewGoals() {
   <section class="list icons"><a class="it" href="${esc(DONATE_URL)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">${tile('paypal', ['#009cde', '#003087'])}<div class="n"><b>Entwickler unterstützen ☕</b><span>Freiwillige Spende per PayPal</span></div><span class="chev">${icon('right')}</span></a></section>` : ''}
   <p class="foot">Alle Daten bleiben auf diesem Gerät. Es gibt kein Konto und keine Werbung. Eingebaute Lebensmittel sind Richtwerte. Die Online-Suche und der Barcode-Scan nutzen Open Food Facts (offene Datenbank, ODbL).</p>
   <section class="list"><button class="it danger" data-act="wipe">Alle Daten löschen</button></section>
+  ${(lockState() || {}).gesperrt && lockBypassed() ? `<div class="hdr"><span>Sperre</span></div>
+  <section class="list icons"><button class="it" data-act="lockPreview">${tile('warn', ['#ff6b8a', '#e3123f'])}<div class="n"><b>Sperr-Seite ansehen</b><span>Für andere gesperrt, dein Handy ist frei</span></div><span class="chev">${icon('right')}</span></button></section>` : ''}
   <p class="ver" data-act="verTap">Biss · Version ${APP_VERSION}${isOwner() ? ' · Besitzer' : ''}</p>`;
 }
 
@@ -1574,6 +1576,7 @@ const ACT = {
   points: () => openPoints(),
   givePoints: () => openGivePoints(),
   verTap: () => verTap(),
+  lockPreview: () => showLock(lockState() || { gesperrt: true }, true),
   range: b => { histRange = b.dataset.n; histOff = 0; render(); },
   histStep: b => { histOff = Math.max(0, histOff + +b.dataset.d); render(); },
   openmonth: b => { const [y, m] = b.dataset.k.split('-').map(Number), n = kdate(todayKey()); histRange = 'month'; histOff = (n.getFullYear() - y) * 12 + n.getMonth() - (m - 1); render(); window.scrollTo(0, 0); },
@@ -1649,17 +1652,22 @@ async function sha256(t) { const b = await crypto.subtle.digest('SHA-256', new T
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* egal */ } };
 let lockSig = '';
-function showLock(st) {
+const lockBypassed = () => lsGet(OWNER_KEY) === '1' || lsGet(ACCESS_KEY) === ACCESS_HASH;
+const lockState = () => { try { return JSON.parse(lsGet(LOCK_KEY) || 'null'); } catch (e) { return null; } };
+// preview: Sperr-Seite auf einem freigeschalteten Gerät nur ansehen, ohne etwas zu ändern
+function showLock(st, preview = false) {
   let el = $('#lock');
-  if (!st || !st.gesperrt || lsGet(OWNER_KEY) === '1' || lsGet(ACCESS_KEY) === ACCESS_HASH) { if (el) el.remove(); lockSig = ''; return; }
-  const sig = JSON.stringify(st);
+  if (el && el.dataset.preview && !preview) return;
+  if (!st || (!st.gesperrt && !preview) || (!preview && lockBypassed())) { if (el) el.remove(); lockSig = ''; return; }
+  const sig = JSON.stringify(st) + preview;
   if (el && sig === lockSig) return; // nichts geändert: Spiel und Animation nicht neu starten
   lockSig = sig;
   if (!el) { el = document.createElement('div'); el.id = 'lock'; el.setAttribute('role', 'alertdialog'); document.body.appendChild(el); }
+  if (preview) el.dataset.preview = '1'; else delete el.dataset.preview;
   const EM = ['🍎', '🥑', '🍌', '🥦', '🍗', '🥚', '🍓', '🥕', '💪', '🏋️', '🔥', '🥗', '🍳', '🏃'];
   const floats = EM.map((e, i) => `<span style="left:${(i * 7.3 + Math.random() * 5) % 96}%;animation-duration:${9 + Math.random() * 8}s;animation-delay:-${Math.random() * 14}s;font-size:${20 + Math.random() * 16}px">${e}</span>`).join('');
   const best = +(lsGet('biss.reps') || 0);
-  el.innerHTML = `<div class="lk-float" aria-hidden="true">${floats}</div><div class="hello">
+  el.innerHTML = `<div class="lk-float" aria-hidden="true">${floats}</div>${preview ? `<button class="lk-close" id="lockClose">Vorschau schließen</button>` : ''}<div class="hello">
       <div class="lk-ic"><span class="lk-glow"></span><img src="icons/icon-192.png" alt="Hantel stemmen" class="hello-ic" id="lockIc">
         <span class="lk-badge" id="lockBadge"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 10V7a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><rect x="5" y="10" width="14" height="11" rx="3" fill="currentColor"/></svg></span></div>
       <h2 class="lk-in" style="animation-delay:.25s">${esc(st.titel || 'Biss ist gerade gesperrt')}</h2>
@@ -1679,6 +1687,8 @@ function showLock(st) {
     if (reps > rec) { rec = reps; lsSet('biss.reps', String(rec)); bestEl.textContent = `Neuer Rekord: ${rec} 🎉`; }
     if (CHEER[reps]) { toast(CHEER[reps]); buzz(); }
   });
+  const close = () => { el.classList.add('lk-out'); setTimeout(() => { el.remove(); lockSig = ''; render(); }, 450); };
+  if (preview) $('#lockClose', el).addEventListener('click', close);
   // Zugangscode: richtiger Code schaltet dieses Gerät frei
   $('#lockForm', el).addEventListener('submit', async ev => {
     ev.preventDefault();
@@ -1686,7 +1696,7 @@ function showLock(st) {
     if (!code) { inp.focus(); return; }
     if (await sha256(code) === ACCESS_HASH) {
       lsSet(ACCESS_KEY, ACCESS_HASH); inp.blur(); buzz();
-      el.classList.add('lk-out'); setTimeout(() => { el.remove(); lockSig = ''; confetti(); toast('Willkommen in Biss! 🎉'); render(); }, 450);
+      el.classList.add('lk-out'); setTimeout(() => { el.remove(); lockSig = ''; confetti(); toast(preview ? 'Code stimmt ✅' : 'Willkommen in Biss! 🎉'); render(); }, 450);
     } else {
       const f = $('#lockForm', el); f.classList.remove('lk-no'); void f.offsetWidth; f.classList.add('lk-no');
       toast('Falscher Code'); inp.select();
@@ -1696,7 +1706,7 @@ function showLock(st) {
   let taps = 0, tT;
   $('#lockBadge', el).addEventListener('click', () => {
     clearTimeout(tT); tT = setTimeout(() => { taps = 0; }, 2000);
-    if (++taps >= 7) { lsSet(OWNER_KEY, '1'); el.remove(); lockSig = ''; toast('Sperre auf diesem Gerät aufgehoben'); render(); }
+    if (++taps >= 7) { lsSet(OWNER_KEY, '1'); el.remove(); lockSig = ''; toast(preview ? 'Vorschau geschlossen' : 'Sperre auf diesem Gerät aufgehoben'); render(); }
   });
 }
 async function checkLock() {
@@ -1704,7 +1714,9 @@ async function checkLock() {
     const r = await fetch('status.json?t=' + Date.now(), { cache: 'no-store' });
     if (!r.ok) return;
     const st = await r.json();
-    lsSet(LOCK_KEY, JSON.stringify(st)); showLock(st);
+    const prev = lsGet(LOCK_KEY), cur = JSON.stringify(st);
+    lsSet(LOCK_KEY, cur); showLock(st);
+    if (prev !== cur) render();
   } catch (e) { /* offline: letzter Stand gilt */ }
 }
 try { showLock(JSON.parse(lsGet(LOCK_KEY) || 'null')); } catch (e) { /* kein Stand */ }
