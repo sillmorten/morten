@@ -24,7 +24,7 @@ const dayTitle = k => { const t = todayKey(); if (k === t) return 'Heute'; if (k
 
 /* ---------- Daten ---------- */
 // Spendenlink (PayPal.me). Leer lassen, um den Eintrag auszublenden.
-const DONATE_URL = '';
+const DONATE_URL = 'https://paypal.me/MortenUkena';
 const KEY = 'kalorien.v1';
 const DEFAULTS = () => ({ v: 1, setup: false, name: '', greeted: false, goals: { kcal: 2500, c: 280, p: 150, f: 80 }, weightKg: 80, days: {}, foods: {}, weights: [], lastBackup: null });
 let S = load();
