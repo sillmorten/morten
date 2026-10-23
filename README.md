@@ -10,6 +10,10 @@ Alle Daten bleiben lokal auf dem Gerät (localStorage). Lebensmittel kommen von
 - Eintragen per Suche, Barcode-Scan, eigene Lebensmittel oder Schnelleintrag
 - Sport eintragen (Schätzung über Dauer und Gewicht) oder Wert aus Apple Health per Kurzbefehl einfügen
 - Verlauf (Woche, Monat, 3 Monate), Körpergewicht, Backup als Datei
+- Streaks und Abzeichen (Tage im Ziel, Tage eingetragen, Eiweiß, Supplements)
+- Körpermaße mit Verlauf und Fortschrittsfotos (verkleinert in IndexedDB, im Backup enthalten)
+- Supplement-Tracker zum täglichen Abhaken, frei einstellbar
+- Verbesserungswünsche per Mail an den Entwickler
 
 ## Installation auf dem iPhone
 1. Seite in **Safari** öffnen.
@@ -18,6 +22,6 @@ Alle Daten bleiben lokal auf dem Gerät (localStorage). Lebensmittel kommen von
 
 ## Technik
 Reines HTML/CSS/JavaScript ohne Build-Schritt. `sw.js` cached die App für den Offline-Betrieb.
-Nach Änderungen die `VERSION` in `sw.js` hochzählen, damit Geräte das Update laden.
+Nach Änderungen die `VERSION` in `sw.js` hochzählen, damit Geräte das Update laden, und `APP_VERSION` in `app.js` anpassen (wird unter „Ziele“ angezeigt).
 
 Icons: [Phosphor Icons](https://phosphoricons.com) (MIT). Barcode: [ZXing](https://github.com/zxing-js/library) (Apache 2.0).

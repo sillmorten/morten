@@ -25,19 +25,37 @@ const dayTitle = k => { const t = todayKey(); if (k === t) return 'Heute'; if (k
 /* ---------- Daten ---------- */
 // Spendenlink (PayPal.me). Leer lassen, um den Eintrag auszublenden.
 const DONATE_URL = 'https://paypal.me/MortenUkena';
+// Verbesserungswünsche gehen per Mail an diese Adresse. Leer lassen, um den Eintrag auszublenden.
+const WISH_MAIL = 'info@sill-media.de';
+// Versionsnummer für die Anzeige in der App. Bei jedem Update zusammen mit VERSION in sw.js hochzählen.
+const APP_VERSION = '1.2.0';
 const KEY = 'kalorien.v1';
-const DEFAULTS = () => ({ v: 1, setup: false, name: '', greeted: false, goals: { kcal: 2500, c: 280, p: 150, f: 80 }, weightKg: 80, days: {}, foods: {}, weights: [], lastBackup: null });
+const DEFAULTS = () => ({
+  v: 1, setup: false, name: '', greeted: false, goals: { kcal: 2500, c: 280, p: 150, f: 80 }, weightKg: 80, days: {}, foods: {}, weights: [], lastBackup: null,
+  supps: [{ id: 'kreatin', name: 'Kreatin', dose: '5 g' }, { id: 'shake', name: 'Protein-Shake', dose: '' }, { id: 'vitamine', name: 'Vitamine', dose: '' }],
+  suppLog: {}, body: [], photos: [], badges: null,
+});
+// Ältere Speicherstände und Backups bekommen fehlende Felder mit Standardwerten
+function normalize(o) {
+  const d = DEFAULTS(), s = { ...d, ...o, goals: { ...d.goals, ...(o.goals || {}) } };
+  for (const k of ['weights', 'supps', 'body', 'photos']) if (!Array.isArray(s[k])) s[k] = d[k];
+  for (const k of ['days', 'foods', 'suppLog']) if (!s[k] || typeof s[k] !== 'object') s[k] = {};
+  if (s.badges && typeof s.badges !== 'object') s.badges = null;
+  return s;
+}
 let S = load();
 function load() {
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw) { const o = JSON.parse(raw); const d = DEFAULTS(); return { ...d, ...o, goals: { ...d.goals, ...(o.goals || {}) } }; }
+    if (raw) return normalize(JSON.parse(raw));
   } catch (e) { /* leer starten */ }
   return DEFAULTS();
 }
+let badgeT;
 function save() {
   try { localStorage.setItem(KEY, JSON.stringify(S)); }
   catch (e) { toast('Speichern fehlgeschlagen. Ist der Speicher voll?'); }
+  clearTimeout(badgeT); badgeT = setTimeout(checkBadges, 1600);
 }
 const getDay = k => S.days[k] || { food: [], sport: [] };
 const ensureDay = k => (S.days[k] ||= { food: [], sport: [] });
@@ -143,6 +161,7 @@ function viewToday() {
   </header>
   <h1 class="lt"><small>${longDate(cur)}</small>${dayTitle(cur)}</h1>
   ${isToday && S.name ? `<p class="greet">${greeting()}</p>` : ''}
+  ${isToday ? streakPill() : ''}
   <section class="card hero">
     <div class="ringwrap">${ring(over ? 1 : (avail ? t.kcal / avail : 0), over ? 'var(--org)' : 'var(--tint)', { size: 140, stroke: 18 })}
       <div class="ringlabel"><b class="num">${n0(Math.abs(left))}</b><span>${over ? 'kcal zu viel' : 'kcal übrig'}</span></div></div>
@@ -160,7 +179,20 @@ function viewToday() {
     ${meals}
     <div class="it tap" data-act="sport" role="button">${tile('barbell', ['#ff5c7c', '#e8264d'])}<div class="n"><b>Sport</b><span>${sportSub}</span></div>
       ${t.burned ? `<span class="k good num">−${n0(t.burned)}</span>` : ''}<span class="${t.burned ? 'chev' : 'plus'}">${icon(t.burned ? 'right' : 'plus')}</span></div>
-  </section>`;
+  </section>
+  ${suppSection()}`;
+}
+function suppSection() {
+  if (!S.supps.length) return '';
+  const taken = S.suppLog[cur] || [], done = S.supps.filter(s => taken.includes(s.id)).length;
+  return `<div class="hdr"><span>Supplements · ${done} von ${S.supps.length}</span><button data-act="supps">Bearbeiten</button></div>
+  <section class="list icons">${S.supps.map(s => { const on = taken.includes(s.id); return `<button class="it" data-act="suppToggle" data-id="${esc(s.id)}" aria-pressed="${on}">${tile('pill', ['#c77dff', '#9b4dde'])}<div class="n"><b>${esc(s.name)}</b><span>${on ? 'Erledigt' : s.dose ? esc(s.dose) : 'Antippen zum Abhaken'}</span></div><span class="chk${on ? ' on' : ''}">${icon('check')}</span></button>`; }).join('')}</section>`;
+}
+function streakPill() {
+  if (!Object.keys(S.days).length) return '';
+  const g = streakInfo(dayInGoal), l = streakInfo(dayLogged);
+  const txt = g.cur ? `🔥 <b class="num">${g.cur}</b> ${g.cur === 1 ? 'Tag' : 'Tage'} im Ziel` : l.cur > 1 ? `📅 <b class="num">${l.cur}</b> Tage am Stück eingetragen` : '🔥 Heute im Ziel bleiben und Streak starten';
+  return `<button class="streak" data-act="badges">${txt}${g.best > 1 ? `<span>Rekord ${g.best}</span>` : ''}${icon('right')}</button>`;
 }
 
 function greeting() {
@@ -215,6 +247,8 @@ function viewHistory() {
     <div class="it">${tile('egg', ['#4ee37a', '#24b34b'])}<div class="n"><b>Eiweiß</b><span>${base.length ? `Ø ${n0(pAvg)} g · Ziel ${n0(S.goals.p)} g` : 'Noch keine Daten'}</span></div>${base.length && pAvg >= S.goals.p * .95 ? `<span style="color:var(--grn);font-size:22px">${icon('check')}</span>` : ''}</div>
     <div class="it"><span class="ic" style="background:linear-gradient(180deg,#ffb340,#ff8a00)">${icon('bolt')}</span><div class="n"><b>Makros im Schnitt</b><span>${base.length ? `${n0(avg('c'))} g KH · ${n0(pAvg)} g Eiweiß · ${n0(avg('f'))} g Fett` : 'Noch keine Daten'}</span></div></div>
     <button class="it" data-act="weight">${tile('scales', ['#40a0ff', '#0a6fe0'])}<div class="n"><b>Körpergewicht</b><span>${lastW ? `${n1(lastW.kg)} kg${wDiff !== null ? ` · ${wDiff > 0 ? '+' : wDiff < 0 ? '−' : '±'}${n1(Math.abs(wDiff))} kg in 30 Tagen` : ''}` : 'Gewicht eintragen'}</span></div><span class="chev">${icon('right')}</span></button>
+    <button class="it" data-act="body">${tile('ruler', ['#5ac8fa', '#1a9bd7'])}<div class="n"><b>Körpermaße & Fotos</b><span>${bodySub()}</span></div><span class="chev">${icon('right')}</span></button>
+    <button class="it" data-act="badges">${tile('trophy', ['#ffd60a', '#f5a300'])}<div class="n"><b>Streaks & Abzeichen</b><span>${earnedCount()} von ${BADGES.length} Abzeichen</span></div><span class="chev">${icon('right')}</span></button>
     <button class="it" data-act="backup">${tile('cloud', backupAge !== null && backupAge < 30 || !hasAny ? ['#a1a1a6', '#6e6e73'] : ['#ffb340', '#ff8a00'])}<div class="n"><b>Backup</b><span>${backupSub}</span></div><span class="chev">${icon('right')}</span></button>
   </section>
   ${days ? `<div class="hdr"><span>Tage</span></div><section class="list">${days}</section>` : `<p class="empty">Hier erscheinen deine Tage, sobald du etwas eingetragen hast.</p>`}`;
@@ -245,16 +279,21 @@ function viewGoals() {
   <section class="list">${inp('weightKg', 'Körpergewicht', n1(S.weightKg), 'kg')}</section>
   <div class="hdr"><span>Profil</span></div>
   <section class="list"><div class="row-in"><label for="name">Dein Name</label><input id="name" class="wide" value="${esc(S.name)}" data-goal="name" autocapitalize="words" placeholder="Name"><span class="u"></span></div></section>
+  <div class="hdr"><span>Tägliche Routine</span></div>
+  <section class="list icons"><button class="it" data-act="supps">${tile('pill', ['#c77dff', '#9b4dde'])}<div class="n"><b>Supplements</b><span>${S.supps.length ? esc(S.supps.map(s => s.name).join(', ')) : 'Ausgeblendet, tippen zum Einrichten'}</span></div><span class="chev">${icon('right')}</span></button></section>
   <div class="hdr"><span>Daten</span></div>
   <section class="list icons">
     <button class="it" data-act="backup">${tile('cloud', ['#40a0ff', '#0a6fe0'])}<div class="n"><b>Backup erstellen oder laden</b><span>Sicherungsdatei, z. B. in iCloud Drive</span></div><span class="chev">${icon('right')}</span></button>
     <button class="it" data-act="healthHelp">${tile('heart', ['#ff5c7c', '#e8264d'])}<div class="n"><b>Apple Health verbinden</b><span>Verbrannte Kalorien per Kurzbefehl</span></div><span class="chev">${icon('right')}</span></button>
     <button class="it" data-act="ownFoods">${tile('pencil', ['#a1a1a6', '#6e6e73'])}<div class="n"><b>Eigene Lebensmittel</b><span>${Object.values(S.foods).length} gespeichert</span></div><span class="chev">${icon('right')}</span></button>
   </section>
+  ${WISH_MAIL ? `<div class="hdr"><span>Feedback</span></div>
+  <section class="list icons"><button class="it" data-act="wish">${tile('sparkle', ['#ffd60a', '#f5a300'])}<div class="n"><b>Wunsch senden 💡</b><span>Was fehlt dir? Sag’s dem Entwickler</span></div><span class="chev">${icon('right')}</span></button></section>` : ''}
   ${DONATE_URL ? `<div class="hdr"><span>Unterstützen</span></div>
   <section class="list icons"><a class="it" href="${esc(DONATE_URL)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">${tile('paypal', ['#009cde', '#003087'])}<div class="n"><b>Entwickler unterstützen ☕</b><span>Freiwillige Spende per PayPal</span></div><span class="chev">${icon('right')}</span></a></section>` : ''}
   <p class="foot">Alle Daten bleiben auf diesem Gerät. Es gibt kein Konto und keine Werbung. Eingebaute Lebensmittel sind Richtwerte. Die Online-Suche und der Barcode-Scan nutzen Open Food Facts (offene Datenbank, ODbL).</p>
-  <section class="list"><button class="it danger" data-act="wipe">Alle Daten löschen</button></section>`;
+  <section class="list"><button class="it danger" data-act="wipe">Alle Daten löschen</button></section>
+  <p class="ver">Biss · Version ${APP_VERSION}</p>`;
 }
 
 /* ---------- Ebenen (Sheets und Seiten) ---------- */
@@ -692,30 +731,301 @@ function openWeight() {
     draw();
   });
 }
-function weightChart(w) {
+function weightChart(w, key = 'kg', color = 'var(--blu)') {
   const W = 320, H = 160, L = 34, R = 8, T = 10, B = 22;
-  const xs = w.map(x => kdate(x.date).getTime()), ys = w.map(x => x.kg);
+  const xs = w.map(x => kdate(x.date).getTime()), ys = w.map(x => x[key]);
   let y0 = Math.min(...ys), y1 = Math.max(...ys); if (y1 - y0 < 2) { y0 -= 1; y1 += 1; }
   y0 = Math.floor(y0); y1 = Math.ceil(y1);
   const x0 = xs[0], x1 = xs[xs.length - 1] || x0 + 1;
   const X = t => L + (t - x0) / Math.max(1, x1 - x0) * (W - L - R), Y = v => T + (1 - (v - y0) / (y1 - y0)) * (H - T - B);
-  const pts = w.map((x, i) => `${X(xs[i]).toFixed(1)},${Y(x.kg).toFixed(1)}`);
+  const pts = w.map((x, i) => `${X(xs[i]).toFixed(1)},${Y(x[key]).toFixed(1)}`);
   const ticks = [y0, (y0 + y1) / 2, y1];
   const lp = pts[pts.length - 1].split(',');
   return `<svg viewBox="0 0 ${W} ${H}" style="overflow:visible">
     ${ticks.map(v => `<line x1="${L}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}" style="stroke:var(--sep)" stroke-width="1"/><text x="${L - 6}" y="${Y(v) + 4}" text-anchor="end" font-size="10" style="fill:var(--l2)">${n1(v)}</text>`).join('')}
-    <path d="M${pts[0]} L${pts.join(' L')} L${X(x1)},${H - B} L${X(x0)},${H - B}Z" style="fill:color-mix(in srgb, var(--blu) 18%, transparent)"/>
-    <polyline points="${pts.join(' ')}" fill="none" style="stroke:var(--blu)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
-    <circle cx="${lp[0]}" cy="${lp[1]}" r="4.5" style="fill:var(--blu);stroke:var(--sheetcard)" stroke-width="2"/>
+    <path d="M${pts[0]} L${pts.join(' L')} L${X(x1)},${H - B} L${X(x0)},${H - B}Z" style="fill:color-mix(in srgb, ${color} 18%, transparent)"/>
+    <polyline points="${pts.join(' ')}" fill="none" style="stroke:${color}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+    <circle cx="${lp[0]}" cy="${lp[1]}" r="4.5" style="fill:${color};stroke:var(--sheetcard)" stroke-width="2"/>
     <text x="${L}" y="${H - 5}" font-size="10" style="fill:var(--l2)">${shortDate(w[0].date)}</text>
     <text x="${W - R}" y="${H - 5}" font-size="10" text-anchor="end" style="fill:var(--l2)">${shortDate(w[w.length - 1].date)}</text></svg>`;
 }
 
+/* ---------- Streaks und Abzeichen ---------- */
+const dayLogged = k => getDay(k).food.length > 0;
+// „Im Ziel“: mindestens 80 % und höchstens 105 % des Kalorienziels (plus Sport)
+function dayInGoal(k) {
+  if (!dayLogged(k)) return false;
+  const t = totals(k), av = S.goals.kcal + t.burned;
+  return t.kcal >= av * 0.8 && t.kcal <= av * 1.05;
+}
+const dayProtein = k => dayLogged(k) && totals(k).p >= S.goals.p * 0.95;
+const daySupps = k => S.supps.length > 0 && S.supps.every(s => (S.suppLog[k] || []).includes(s.id));
+// Aktuelle Serie zählt bis heute; ist heute noch nicht erfüllt, zählt sie bis gestern (der Tag läuft ja noch)
+function streakInfo(test, keys = Object.keys(S.days)) {
+  const t = todayKey();
+  let k = test(t) ? t : addDays(t, -1), cur = 0;
+  while (test(k)) { cur++; k = addDays(k, -1); }
+  let best = 0, run = 0, prev = null;
+  for (const d of keys.filter(test).sort()) { run = prev && addDays(prev, 1) === d ? run + 1 : 1; best = Math.max(best, run); prev = d; }
+  return { cur, best: Math.max(best, cur) };
+}
+function badgeStats() {
+  const days = Object.values(S.days);
+  return {
+    log: streakInfo(dayLogged), goal: streakInfo(dayInGoal), prot: streakInfo(dayProtein), supp: streakInfo(daySupps, Object.keys(S.suppLog)),
+    logged: Object.keys(S.days).filter(dayLogged).length,
+    entries: days.reduce((a, d) => a + d.food.length, 0),
+    sport: days.reduce((a, d) => a + d.sport.length, 0),
+    weights: S.weights.length, body: S.body.length, photos: S.photos.length,
+  };
+}
+const BADGES = [
+  { id: 'first', e: '🍽️', n: 'Erster Biss', d: 'Das erste Essen eingetragen', goal: 1, v: s => s.entries },
+  { id: 'goal3', e: '🔥', n: 'Warmgelaufen', d: '3 Tage am Stück im Ziel', goal: 3, v: s => s.goal.best },
+  { id: 'goal7', e: '🔥', n: 'Eine Woche on fire', d: '7 Tage am Stück im Ziel', goal: 7, v: s => s.goal.best },
+  { id: 'goal14', e: '⚡', n: 'Nicht zu stoppen', d: '14 Tage am Stück im Ziel', goal: 14, v: s => s.goal.best },
+  { id: 'goal30', e: '🏆', n: 'Monats-Champion', d: '30 Tage am Stück im Ziel', goal: 30, v: s => s.goal.best },
+  { id: 'log7', e: '📅', n: 'Dranbleiber', d: '7 Tage am Stück eingetragen', goal: 7, v: s => s.log.best },
+  { id: 'log30', e: '🗓️', n: 'Gewohnheitstier', d: '30 Tage am Stück eingetragen', goal: 30, v: s => s.log.best },
+  { id: 'prot7', e: '💪', n: 'Eiweiß-Profi', d: '7 Tage am Stück das Eiweißziel geschafft', goal: 7, v: s => s.prot.best },
+  { id: 'supp7', e: '💊', n: 'Routine sitzt', d: '7 Tage am Stück alle Supplements genommen', goal: 7, v: s => s.supp.best },
+  { id: 'days50', e: '⭐', n: 'Halbe Hundert', d: 'An 50 Tagen eingetragen', goal: 50, v: s => s.logged },
+  { id: 'days100', e: '💯', n: 'Hundert Tage', d: 'An 100 Tagen eingetragen', goal: 100, v: s => s.logged },
+  { id: 'sport10', e: '🏋️', n: 'Sportskanone', d: '10 Sporteinheiten eingetragen', goal: 10, v: s => s.sport },
+  { id: 'weigh10', e: '⚖️', n: 'Waagemutig', d: '10-mal das Gewicht eingetragen', goal: 10, v: s => s.weights },
+  { id: 'body', e: '📏', n: 'Maßband raus', d: 'Erste Körpermaße eingetragen', goal: 1, v: s => s.body },
+  { id: 'photo', e: '📸', n: 'Vorher-Bild', d: 'Erstes Fortschrittsfoto gemacht', goal: 1, v: s => s.photos },
+];
+const earnedCount = () => BADGES.filter(b => S.badges && S.badges[b.id]).length;
+// Beim ersten Start mit dieser Version: schon Erreichtes still freischalten, ohne Konfetti-Flut
+function initBadges() {
+  S.badges = {};
+  const s = badgeStats(), t = todayKey();
+  for (const b of BADGES) if (b.v(s) >= b.goal) S.badges[b.id] = t;
+}
+function checkBadges() {
+  if (!S.badges) return;
+  const s = badgeStats(), fresh = BADGES.filter(b => !S.badges[b.id] && b.v(s) >= b.goal);
+  if (!fresh.length) return;
+  const t = todayKey(); fresh.forEach(b => { S.badges[b.id] = t; });
+  try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {}
+  toast(`Neues Abzeichen: ${fresh[0].e} ${fresh[0].n}`); buzz(); confetti();
+  render();
+}
+function openBadges() {
+  const s = badgeStats();
+  const big = (e, v, l, best) => `<div class="sk"><div class="e">${e}</div><b class="num">${v}</b><span>${l}</span><em>Rekord ${best}</em></div>`;
+  openLayer('sheet', `
+    <div class="sh"><div class="t"><b>Streaks & Abzeichen</b><span>${earnedCount()} von ${BADGES.length} freigeschaltet</span></div><button class="xb" data-act="close" aria-label="Schließen">${icon('x')}</button></div>
+    <section class="card streaks">
+      ${big('🔥', s.goal.cur, s.goal.cur === 1 ? 'Tag im Ziel' : 'Tage im Ziel', s.goal.best)}
+      ${big('📅', s.log.cur, s.log.cur === 1 ? 'Tag eingetragen' : 'Tage eingetragen', s.log.best)}
+    </section>
+    <p class="note">Im Ziel bist du, wenn du zwischen 80 und 105 % deines Kalorienziels landest. Verbrannte Kalorien zählen dazu. Der heutige Tag zählt mit, sobald er geschafft ist.</p>
+    <div class="badges">${BADGES.map(b => {
+      const got = S.badges && S.badges[b.id], v = Math.min(b.v(s), b.goal);
+      return `<div class="bdg${got ? '' : ' off'}"><div class="e">${b.e}</div><b>${b.n}</b><span>${b.d}</span>${got ? `<em>${shortDate(got)}</em>` : b.goal > 1 ? `<i style="--p:${(v / b.goal * 100).toFixed(0)}%"></i><em>${v} / ${b.goal}</em>` : '<em>Noch offen</em>'}</div>`;
+    }).join('')}</div>`);
+}
+
+/* ---------- Supplements verwalten ---------- */
+const SUPP_IDEAS = ['Kreatin', 'Protein-Shake', 'Vitamine', 'Vitamin D', 'Magnesium', 'Omega-3', 'Zink', 'Multivitamin', 'Eisen', 'Koffein'];
+function openSupps() {
+  openLayer('sheet', `<div id="suBody" style="display:flex;flex-direction:column;gap:14px"></div>`, el => {
+    const draw = () => {
+      const ideas = SUPP_IDEAS.filter(n => !S.supps.some(s => norm(s.name) === norm(n)));
+      $('#suBody', el).innerHTML = `
+        <div class="sh"><div class="t"><b>Supplements</b><span>Jeden Tag auf „Heute“ abhaken</span></div><button class="xb" data-act="close" aria-label="Schließen">${icon('x')}</button></div>
+        ${S.supps.length ? `<section class="list">${S.supps.map(s => `<div class="it"><div class="n"><b>${esc(s.name)}</b><span>${s.dose ? esc(s.dose) : 'Ohne Dosis'}</span></div><button class="xb" data-sudel="${esc(s.id)}" aria-label="${esc(s.name)} entfernen" style="color:var(--red)">${icon('trash')}</button></div>`).join('')}</section>` : '<p class="empty">Keine Supplements. Der Bereich ist auf „Heute“ ausgeblendet.</p>'}
+        <section class="list">
+          <div class="row-in"><label for="suName">Name</label><input id="suName" class="wide" placeholder="z. B. Magnesium" autocapitalize="words"><span class="u"></span></div>
+          <div class="row-in"><label for="suDose">Dosis</label><input id="suDose" class="wide" placeholder="optional, z. B. 5 g"><span class="u"></span></div>
+        </section>
+        <button class="btn" id="suAdd">Hinzufügen</button>
+        ${ideas.length ? `<div class="chips">${ideas.map(n => `<button class="chip" data-suidea="${esc(n)}">${icon('plus')}${esc(n)}</button>`).join('')}</div>` : ''}`;
+      const add = (name, dose) => {
+        name = name.trim().slice(0, 40); if (!name) { toast('Bitte einen Namen eingeben'); return; }
+        S.supps.push({ id: uid(), name, dose: (dose || '').trim().slice(0, 30) }); save(); render(); draw(); toast(`${name} hinzugefügt`);
+      };
+      $('#suAdd', el).addEventListener('click', () => add($('#suName', el).value, $('#suDose', el).value));
+      el.querySelectorAll('[data-suidea]').forEach(b => b.addEventListener('click', () => add(b.dataset.suidea, '')));
+      el.querySelectorAll('[data-sudel]').forEach(b => b.addEventListener('click', () => { S.supps = S.supps.filter(s => s.id !== b.dataset.sudel); save(); render(); draw(); }));
+    };
+    draw();
+  });
+}
+
+/* ---------- Fotos (IndexedDB, weil localStorage dafür zu klein ist) ---------- */
+const PDB = (() => {
+  let p;
+  const open = () => p ||= new Promise((res, rej) => {
+    const r = indexedDB.open('biss', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('photos');
+    r.onsuccess = () => res(r.result); r.onerror = () => { p = null; rej(r.error); };
+  });
+  const run = async (mode, fn) => {
+    const db = await open();
+    return new Promise((res, rej) => {
+      const t = db.transaction('photos', mode), out = fn(t.objectStore('photos'));
+      t.oncomplete = () => res(out ? out.result : undefined); t.onerror = t.onabort = () => rej(t.error);
+    });
+  };
+  return { get: k => run('readonly', s => s.get(k)), put: (k, v) => run('readwrite', s => { s.put(v, k); }), del: k => run('readwrite', s => { s.delete(k); }), clear: () => run('readwrite', s => { s.clear(); }) };
+})();
+const thumbCache = new Map();
+async function loadAllPhotos() {
+  const out = {};
+  for (const p of S.photos) { const [full, thumb] = await Promise.all([PDB.get(p.id), PDB.get(p.id + ':t')]); if (full) out[p.id] = { full, thumb }; }
+  return out;
+}
+// Foto verkleinern: max. 1280 px als JPEG, dazu ein quadratisches Vorschaubild
+async function compressPhoto(file) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('img')); i.src = url; });
+    const w = img.naturalWidth, h = img.naturalHeight, sc = Math.min(1, 1280 / Math.max(w, h));
+    const c = document.createElement('canvas'); c.width = Math.round(w * sc); c.height = Math.round(h * sc);
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    const full = c.toDataURL('image/jpeg', 0.72);
+    const t = document.createElement('canvas'), m = Math.min(w, h); t.width = t.height = 240;
+    t.getContext('2d').drawImage(img, (w - m) / 2, (h - m) / 3, m, m, 0, 0, 240, 240);
+    return { full, thumb: t.toDataURL('image/jpeg', 0.7) };
+  } finally { URL.revokeObjectURL(url); }
+}
+async function getThumb(id) {
+  if (!thumbCache.has(id)) thumbCache.set(id, PDB.get(id + ':t').then(v => v || PDB.get(id)).catch(() => null));
+  return thumbCache.get(id);
+}
+function fillThumbs(root) {
+  root.querySelectorAll('img[data-ph]').forEach(async im => { const src = await getThumb(im.dataset.ph); if (src) im.src = src; });
+}
+async function addPhoto(file) {
+  toast('Foto wird gespeichert …');
+  try {
+    const { full, thumb } = await compressPhoto(file);
+    const id = 'ph' + uid();
+    await PDB.put(id, full); await PDB.put(id + ':t', thumb);
+    S.photos.push({ id, date: todayKey(), t: Date.now() }); S.photos.sort((a, b) => a.date.localeCompare(b.date) || a.t - b.t);
+    save(); buzz(); toast('Foto gespeichert'); drawBody(); render();
+  } catch (e) { toast('Das Foto konnte nicht gespeichert werden'); }
+}
+async function openPhoto(id) {
+  const p = S.photos.find(x => x.id === id); if (!p) return;
+  openLayer('sheet', `
+    <div class="sh"><div class="t"><b>Fortschrittsfoto</b><span>${longDate(p.date)} ${kdate(p.date).getFullYear()}</span></div><button class="xb" data-act="close" aria-label="Schließen">${icon('x')}</button></div>
+    <img class="phfull" id="phImg" alt="Fortschrittsfoto vom ${shortDate(p.date)}">
+    <button class="btn del" id="phDel">Foto löschen</button>`, el => {
+    getThumb(id).then(src => { const im = $('#phImg', el); if (src && !im.src) im.src = src; });
+    PDB.get(id).then(src => { if (src) $('#phImg', el).src = src; }).catch(() => {});
+    $('#phDel', el).addEventListener('click', ev => {
+      const b = ev.currentTarget;
+      if (!b.dataset.sure) { b.dataset.sure = 1; b.textContent = 'Wirklich löschen? Nochmal tippen'; return; }
+      S.photos = S.photos.filter(x => x.id !== id); thumbCache.delete(id);
+      PDB.del(id).catch(() => {}); PDB.del(id + ':t').catch(() => {});
+      save(); closeTop(); toast('Foto gelöscht'); drawBody(); render();
+    });
+  });
+}
+
+/* ---------- Körpermaße ---------- */
+const MEASURES = [
+  { id: 'waist', name: 'Taille', unit: 'cm' }, { id: 'chest', name: 'Brust', unit: 'cm' }, { id: 'hips', name: 'Hüfte', unit: 'cm' },
+  { id: 'arm', name: 'Oberarm', unit: 'cm' }, { id: 'thigh', name: 'Oberschenkel', unit: 'cm' }, { id: 'fat', name: 'Körperfett', unit: '%' },
+];
+const series = id => S.body.filter(e => e[id] > 0);
+function bodySub() {
+  const parts = [];
+  const w = series('waist'); if (w.length) parts.push(`Taille ${n1(w[w.length - 1].waist)} cm`);
+  if (S.photos.length) parts.push(`${S.photos.length} ${S.photos.length === 1 ? 'Foto' : 'Fotos'}`);
+  if (!parts.length && S.body.length) parts.push(`Zuletzt ${shortDate(S.body[S.body.length - 1].date)}`);
+  return parts.length ? parts.join(' · ') : 'Maße und Fotos nur auf dem iPhone';
+}
+let bodyEl = null, bodyMeasure = 'waist';
+function openBody() {
+  openLayer('page', `<div id="bodyBody" style="display:flex;flex-direction:column;gap:12px"></div>
+    <input type="file" id="phFile" accept="image/*" hidden>`, el => {
+    bodyEl = el;
+    $('#phFile', el).addEventListener('change', ev => { const f = ev.target.files[0]; if (f) addPhoto(f); ev.target.value = ''; });
+    drawBody();
+    return () => { bodyEl = null; };
+  });
+}
+function drawBody() {
+  if (!bodyEl) return;
+  const b = $('#bodyBody', bodyEl), ph = S.photos;
+  const first = ph[0], last = ph[ph.length - 1];
+  const days = first && last ? Math.round((kdate(last.date) - kdate(first.date)) / 864e5) : 0;
+  const avail = MEASURES.filter(m => series(m.id).length);
+  if (!avail.some(m => m.id === bodyMeasure) && avail.length) bodyMeasure = avail[0].id;
+  const sel = series(bodyMeasure), selM = MEASURES.find(m => m.id === bodyMeasure);
+  const diff = (s, m) => { if (s.length < 2) return ''; const d = s[s.length - 1][m.id] - s[0][m.id]; return ` · ${d > 0 ? '+' : d < 0 ? '−' : '±'}${n1(Math.abs(d))} ${m.unit} seit ${shortDate(s[0].date)}`; };
+  b.innerHTML = `
+    <div class="nav"><button class="navbtn" data-act="close">${icon('left')}Verlauf</button></div>
+    <h1 class="lt">Körper</h1>
+    <div class="hdr"><span>Fortschrittsfotos</span></div>
+    ${ph.length >= 2 ? `<section class="card cmp">
+      <figure><img data-ph="${first.id}" alt="" data-act="photo" data-id="${first.id}"><figcaption>Vorher · ${shortDate(first.date)}</figcaption></figure>
+      <figure><img data-ph="${last.id}" alt="" data-act="photo" data-id="${last.id}"><figcaption>Jetzt · ${shortDate(last.date)}</figcaption></figure>
+      ${days > 0 ? `<p>${days} ${days === 1 ? 'Tag' : 'Tage'} Unterschied</p>` : ''}</section>` : ''}
+    ${ph.length ? `<div class="phgrid">${ph.slice().reverse().map(p => `<button data-act="photo" data-id="${p.id}"><img data-ph="${p.id}" alt="Foto vom ${shortDate(p.date)}"><span>${shortDate(p.date).slice(4)}</span></button>`).join('')}</div>` : `<section class="list"><p class="empty">Mach alle paar Wochen ein Foto, gleiche Pose, gleiches Licht. So siehst du Fortschritte, die die Waage nicht zeigt.</p></section>`}
+    <button class="btn sec iconbtn" data-act="addPhoto">${icon('camera')}Foto hinzufügen</button>
+    <p class="foot">Fotos bleiben nur auf diesem iPhone. Sie werden verkleinert gespeichert und sind im Backup enthalten.</p>
+    <div class="hdr"><span>Körpermaße</span></div>
+    ${avail.length ? `<section class="list">${avail.map(m => { const s = series(m.id), l = s[s.length - 1]; return `<button class="it${m.id === bodyMeasure ? ' sel' : ''}" data-act="bodyMeasure" data-m="${m.id}"><div class="n"><b>${m.name}</b><span>${shortDate(l.date)}${diff(s, m)}</span></div><span class="k num">${n1(l[m.id])} ${m.unit}</span></button>`; }).join('')}</section>
+    ${sel.length >= 2 ? `<section class="card wchart"><div class="ctop">${selM.name}</div>${weightChart(sel.slice(-60), bodyMeasure, 'var(--tint)')}</section>` : ''}` : ''}
+    <button class="btn${avail.length ? ' sec' : ''} iconbtn" data-act="measure">${icon('ruler')}Maße eintragen</button>
+    ${S.body.length ? `<div class="hdr"><span>Einträge</span></div><section class="list">${S.body.slice().reverse().slice(0, 40).map(e => `<div class="it"><div class="n"><b>${shortDate(e.date)}</b><span>${esc(MEASURES.filter(m => e[m.id] > 0).map(m => `${m.name} ${n1(e[m.id])}`).join(' · '))}</span></div><button class="xb" data-bdel="${e.date}" aria-label="Löschen" style="color:var(--red)">${icon('trash')}</button></div>`).join('')}</section>` : `<p class="foot">Miss am besten morgens, nüchtern und immer an derselben Stelle. Taille: auf Höhe des Bauchnabels.</p>`}`;
+  b.querySelectorAll('[data-bdel]').forEach(x => x.addEventListener('click', ev => {
+    const btn = ev.currentTarget;
+    if (!btn.dataset.sure) { btn.dataset.sure = 1; btn.style.background = 'color-mix(in srgb, var(--red) 20%, transparent)'; return; }
+    S.body = S.body.filter(e => e.date !== btn.dataset.bdel); save(); drawBody(); render();
+  }));
+  fillThumbs(b);
+}
+function openMeasure() {
+  const lastOf = id => { const s = series(id); return s.length ? s[s.length - 1][id] : null; };
+  const t = todayKey(), today = S.body.find(e => e.date === t) || {};
+  openLayer('sheet', `
+    <div class="sh"><div class="t"><b>Maße eintragen</b><span>Für heute, leere Felder werden übersprungen</span></div><button class="xb" data-act="close" aria-label="Schließen">${icon('x')}</button></div>
+    <section class="list">${MEASURES.map(m => `<div class="row-in"><label for="ms_${m.id}">${m.name}</label><input id="ms_${m.id}" inputmode="decimal" value="${today[m.id] ? n1(today[m.id]) : ''}" placeholder="${lastOf(m.id) ? n1(lastOf(m.id)) : '0'}"><span class="u">${m.unit}</span></div>`).join('')}</section>
+    <button class="btn" id="msOk">Speichern</button>`, el => {
+    $('#msOk', el).addEventListener('click', () => {
+      const e = { date: t };
+      for (const m of MEASURES) { const v = num($('#ms_' + m.id, el).value); if (v > 0 && v < (m.unit === '%' ? 80 : 300)) e[m.id] = Math.round(v * 10) / 10; }
+      if (Object.keys(e).length < 2) { toast('Bitte mindestens ein Maß eintragen'); return; }
+      S.body = S.body.filter(x => x.date !== t); S.body.push(e); S.body.sort((a, b) => a.date.localeCompare(b.date));
+      save(); buzz(); closeTop(); toast('Maße gespeichert'); drawBody(); render();
+    });
+  });
+}
+
+/* ---------- Verbesserungswunsch ---------- */
+function openWish() {
+  openLayer('sheet', `
+    <div class="sh"><div class="t"><b>Wunsch senden 💡</b><span>Geht direkt an den Entwickler</span></div><button class="xb" data-act="close" aria-label="Schließen">${icon('x')}</button></div>
+    <textarea id="wishTxt" class="ta" rows="6" maxlength="2000" placeholder="Was soll die App noch können? Was nervt dich?" autocapitalize="sentences"></textarea>
+    <button class="btn" id="wishOk">Per Mail senden</button>
+    <p class="note">Danach öffnet sich deine Mail-App mit dem fertigen Text. Du musst nur noch auf Senden tippen.</p>`, el => {
+    setTimeout(() => $('#wishTxt', el).focus(), 350);
+    $('#wishOk', el).addEventListener('click', () => {
+      const txt = $('#wishTxt', el).value.trim();
+      if (!txt) { toast('Schreib kurz, was du dir wünschst'); return; }
+      const body = `${txt}\n\n--\n${S.name ? `Von: ${S.name}\n` : ''}Biss Version ${APP_VERSION}`;
+      location.href = `mailto:${WISH_MAIL}?subject=${encodeURIComponent('Biss – Verbesserungswunsch' + (S.name ? ' von ' + S.name : ''))}&body=${encodeURIComponent(body)}`;
+      closeTop(); toast('Danke für deinen Wunsch! 🙌');
+    });
+  });
+}
+
 /* ---------- Backup ---------- */
+let bkPhotos = null;
 function openBackup() {
+  // Fotos schon beim Öffnen laden, damit „Teilen“ direkt nach dem Tippen startet (iOS verlangt das)
+  bkPhotos = S.photos.length ? loadAllPhotos() : Promise.resolve({});
+  bkPhotos.then(p => { bkPhotos.done = p; }).catch(() => { bkPhotos.done = {}; });
   openLayer('sheet', `
     <div class="sh"><div class="t"><b>Backup</b><span>${S.lastBackup ? `Zuletzt gesichert am ${shortDate(dkey(new Date(S.lastBackup)))}` : 'Noch nie gesichert'}</span></div><button class="xb" data-act="close" aria-label="Schließen">${icon('x')}</button></div>
-    <p class="note" style="text-align:left">Deine Daten liegen nur auf diesem iPhone. Sichere sie ab und zu als Datei, z. B. in <b>iCloud Drive</b>. Wenn du die App löschst oder ein neues Handy hast, kannst du sie damit wiederherstellen.</p>
+    <p class="note" style="text-align:left">Deine Daten liegen nur auf diesem iPhone. Sichere sie ab und zu als Datei, z. B. in <b>iCloud Drive</b>. Wenn du die App löschst oder ein neues Handy hast, kannst du sie damit wiederherstellen.${S.photos.length ? ` Deine ${S.photos.length} Fortschrittsfotos sind mit drin.` : ''}</p>
     <button class="btn" id="bkSave">Backup erstellen</button>
     <button class="btn sec" id="bkLoad">Backup wiederherstellen</button>
     <input type="file" id="bkFile" accept="application/json,.json" hidden>`, el => {
@@ -726,7 +1036,8 @@ function openBackup() {
 }
 async function exportBackup() {
   const name = `biss-backup-${todayKey()}.json`;
-  const blob = new Blob([JSON.stringify({ app: 'kalorien', exported: new Date().toISOString(), data: S })], { type: 'application/json' });
+  const photos = bkPhotos && bkPhotos.done ? bkPhotos.done : await (bkPhotos || loadAllPhotos()).catch(() => ({}));
+  const blob = new Blob([JSON.stringify({ app: 'kalorien', version: APP_VERSION, exported: new Date().toISOString(), data: S, photos })], { type: 'application/json' });
   const file = new File([blob], name, { type: 'application/json' });
   try {
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
@@ -744,16 +1055,21 @@ async function exportBackup() {
 function importBackup(file) {
   const r = new FileReader();
   r.onload = () => {
-    let data;
-    try { const o = JSON.parse(r.result); data = o.data || o; } catch (e) { toast('Die Datei ist kein gültiges Backup'); return; }
+    let data, photos = {};
+    try { const o = JSON.parse(r.result); data = o.data || o; photos = o.photos && typeof o.photos === 'object' ? o.photos : {}; } catch (e) { toast('Die Datei ist kein gültiges Backup'); return; }
     if (!data || typeof data !== 'object' || !data.days || !data.goals) { toast('Die Datei ist kein gültiges Backup'); return; }
     const days = Object.keys(data.days).length;
     openLayer('sheet', `
-      <div class="sh"><div class="t"><b>Backup wiederherstellen?</b><span>${days} Tage, ${Object.keys(data.foods || {}).length} Lebensmittel</span></div><button class="xb" data-act="close" aria-label="Schließen">${icon('x')}</button></div>
+      <div class="sh"><div class="t"><b>Backup wiederherstellen?</b><span>${days} Tage, ${Object.keys(data.foods || {}).length} Lebensmittel${Object.keys(photos).length ? `, ${Object.keys(photos).length} Fotos` : ''}</span></div><button class="xb" data-act="close" aria-label="Schließen">${icon('x')}</button></div>
       <p class="note">Die Daten auf diesem iPhone werden durch das Backup ersetzt.</p>
       <button class="btn" id="imOk">Ersetzen</button><button class="btn sec" data-act="close">Abbrechen</button>`, el => {
       $('#imOk', el).addEventListener('click', () => {
-        const d = DEFAULTS(); S = { ...d, ...data, goals: { ...d.goals, ...data.goals }, setup: true }; save(); closeAll(); render(); toast('Backup wiederhergestellt');
+        S = normalize({ ...data, setup: true });
+        S.photos = S.photos.filter(p => photos[p.id] && photos[p.id].full);
+        if (!S.badges) initBadges();
+        save(); closeAll(); render(); toast('Backup wiederhergestellt');
+        thumbCache.clear();
+        PDB.clear().then(() => Promise.all(S.photos.map(p => Promise.all([PDB.put(p.id, photos[p.id].full), PDB.put(p.id + ':t', photos[p.id].thumb || photos[p.id].full)])))).catch(() => toast('Fotos konnten nicht wiederhergestellt werden'));
       });
     });
   };
@@ -860,13 +1176,28 @@ const ACT = {
     openAmount({ ...f, ...(e.per || {}), name: e.name }, { entry: e, day: mealSheet.day });
   },
   weight: () => openWeight(),
+  body: () => openBody(),
+  badges: () => openBadges(),
+  supps: () => openSupps(),
+  wish: () => openWish(),
+  photo: b => openPhoto(b.dataset.id),
+  addPhoto: () => { const f = bodyEl && $('#phFile', bodyEl); if (f) f.click(); },
+  measure: () => openMeasure(),
+  bodyMeasure: b => { bodyMeasure = b.dataset.m; drawBody(); },
+  suppToggle: b => {
+    const id = b.dataset.id, l = S.suppLog[cur] || [];
+    S.suppLog[cur] = l.includes(id) ? l.filter(x => x !== id) : [...l, id];
+    if (!S.suppLog[cur].length) delete S.suppLog[cur];
+    save(); buzz(); render();
+    if (daySupps(cur) && !l.includes(id)) toast('Alle Supplements erledigt ✅');
+  },
   backup: () => openBackup(),
   healthHelp: () => openHealthHelp(),
   range: b => { histRange = +b.dataset.n; render(); },
   kcalFromMacros: () => { const g = S.goals; g.kcal = Math.round(g.c * 4 + g.p * 4 + g.f * 9); save(); render(); toast('Kalorienziel angepasst'); },
   wipe: b => {
     if (!b.dataset.sure) { b.dataset.sure = 1; b.textContent = 'Wirklich alles löschen? Nochmal tippen'; setTimeout(() => { if (b.isConnected) { delete b.dataset.sure; b.textContent = 'Alle Daten löschen'; } }, 4000); return; }
-    S = DEFAULTS(); save(); cur = todayKey(); tab = 'today'; render(); toast('Alle Daten gelöscht'); openWelcome();
+    S = DEFAULTS(); initBadges(); save(); thumbCache.clear(); PDB.clear().catch(() => {}); cur = todayKey(); tab = 'today'; render(); toast('Alle Daten gelöscht'); openWelcome();
   },
 };
 function editQuick(e, k) {
@@ -925,6 +1256,7 @@ document.addEventListener('visibilitychange', () => {
 });
 
 /* ---------- Start ---------- */
+if (!S.badges) { initBadges(); save(); }
 render();
 if (!S.setup || !S.greeted) openWelcome();
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
