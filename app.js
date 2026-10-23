@@ -29,7 +29,7 @@ const DONATE_URL = 'https://paypal.me/MortenUkena';
 // Verbesserungswünsche gehen über Formspree direkt an den Entwickler. Leer lassen, um den Eintrag auszublenden.
 const WISH_URL = 'https://formspree.io/f/xeepbyjn';
 // Versionsnummer für die Anzeige in der App. Bei jedem Update zusammen mit VERSION in sw.js hochzählen.
-const APP_VERSION = '1.4.0';
+const APP_VERSION = '1.4.1';
 const KEY = 'kalorien.v1';
 const DEFAULTS = () => ({
   v: 1, setup: false, name: '', greeted: false, goals: { kcal: 2500, c: 280, p: 150, f: 80 }, weightKg: 80, days: {}, foods: {}, weights: [], lastBackup: null,
@@ -384,6 +384,8 @@ function viewGoals() {
     <button class="it" data-act="healthHelp">${tile('heart', ['#ff5c7c', '#e8264d'])}<div class="n"><b>Apple Health verbinden</b><span>Verbrannte Kalorien per Kurzbefehl</span></div><span class="chev">${icon('right')}</span></button>
     <button class="it" data-act="ownFoods">${tile('pencil', ['#a1a1a6', '#6e6e73'])}<div class="n"><b>Eigene Lebensmittel</b><span>${Object.values(S.foods).length} gespeichert</span></div><span class="chev">${icon('right')}</span></button>
   </section>
+  <div class="hdr"><span>Teilen</span></div>
+  <section class="list icons"><button class="it" data-act="shareApp">${tile('share', ['#ff6b8a', '#e3123f'])}<div class="n"><b>App teilen</b><span>QR-Code zum Scannen zeigen</span></div><span class="chev">${icon('right')}</span></button></section>
   ${WISH_URL ? `<div class="hdr"><span>Feedback</span></div>
   <section class="list icons"><button class="it" data-act="wish">${tile('sparkle', ['#ffd60a', '#f5a300'])}<div class="n"><b>Wunsch senden 💡</b><span>Was fehlt dir? Sag’s dem Entwickler</span></div><span class="chev">${icon('right')}</span></button></section>` : ''}
   ${DONATE_URL ? `<div class="hdr"><span>Unterstützen</span></div>
@@ -789,6 +791,24 @@ function openSport() {
     draw();
   });
 }
+const APP_URL = 'https://sillmorten.github.io/morten/';
+function openShare() {
+  openLayer('sheet', `
+    <div class="sh"><div class="t"><b>Biss teilen</b><span>Mit der iPhone-Kamera scannen</span></div><button class="xb" data-act="close" aria-label="Schließen">${icon('x')}</button></div>
+    <div class="qrbox"><img src="icons/qr.png" alt="QR-Code für ${APP_URL}" width="280" height="280"></div>
+    <section class="card"><ol class="steps">
+      <li>QR-Code mit der Kamera scannen.</li>
+      <li>Link in <b>Safari</b> öffnen.</li>
+      <li><b>Teilen</b> → <b>Zum Home-Bildschirm</b>.</li>
+    </ol></section>
+    <button class="btn" data-act="shareLink">Link senden</button>`);
+}
+async function shareLink() {
+  try { if (navigator.share) { await navigator.share({ title: 'Biss', text: 'Biss: Kalorien und Makros tracken, ohne Abo.', url: APP_URL }); return; } }
+  catch (e) { if (e && e.name === 'AbortError') return; }
+  try { await navigator.clipboard.writeText(APP_URL); toast('Link kopiert'); } catch (e) { toast(APP_URL); }
+}
+
 function openHealthHelp() {
   openLayer('sheet', `
     <div class="sh"><div class="t"><b>Apple Health verbinden</b><span>Einmal einrichten, ca. 5 Minuten</span></div><button class="xb" data-act="close" aria-label="Schließen">${icon('x')}</button></div>
@@ -1407,6 +1427,8 @@ const ACT = {
   },
   backup: () => openBackup(),
   healthHelp: () => openHealthHelp(),
+  shareApp: () => openShare(),
+  shareLink: () => shareLink(),
   range: b => { histRange = b.dataset.n; histOff = 0; render(); },
   histStep: b => { histOff = Math.max(0, histOff + +b.dataset.d); render(); },
   openmonth: b => { const [y, m] = b.dataset.k.split('-').map(Number), n = kdate(todayKey()); histRange = 'month'; histOff = (n.getFullYear() - y) * 12 + n.getMonth() - (m - 1); render(); window.scrollTo(0, 0); },

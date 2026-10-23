@@ -168,6 +168,8 @@ input::placeholder { color: var(--l3); }
 .note { font-size: 13px; color: var(--l2); line-height: 1.45; text-align: center; }
 .steps { margin: 0; padding: 0 0 0 20px; display: flex; flex-direction: column; gap: 10px; font-size: 15px; line-height: 1.45; }
 .steps b { font-weight: 600; }
+.qrbox { align-self: center; background: #fff; border-radius: 22px; padding: 14px; box-shadow: 0 6px 24px rgba(0,0,0,.08); }
+.qrbox img { display: block; width: min(280px, 70vw); height: auto; }
 
 .page {
   position: fixed; inset: 0; z-index: 30; background: var(--bg); overflow-y: auto; -webkit-overflow-scrolling: touch;
