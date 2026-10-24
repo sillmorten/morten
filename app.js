@@ -29,7 +29,7 @@ const DONATE_URL = 'https://paypal.me/MortenUkena';
 // Verbesserungswünsche gehen über Formspree direkt an den Entwickler. Leer lassen, um den Eintrag auszublenden.
 const WISH_URL = 'https://formspree.io/f/xeepbyjn';
 // Versionsnummer für die Anzeige in der App. Bei jedem Update zusammen mit VERSION in sw.js hochzählen.
-const APP_VERSION = '1.12.0';
+const APP_VERSION = '1.12.1';
 const KEY = 'kalorien.v1';
 const DEFAULTS = () => ({
   v: 1, setup: false, name: '', greeted: false, goals: { kcal: 2500, c: 280, p: 150, f: 80 }, weightKg: 80, days: {}, foods: {}, weights: [], lastBackup: null,
@@ -705,7 +705,6 @@ function loadZXing() {
     sc.onload = ok; sc.onerror = () => { zxingP = null; no(new Error('ZXing')); }; document.head.appendChild(sc);
   });
 }
-// qr: QR-Codes (Zugangscode) statt Barcodes auf Verpackungen
 async function openScanner({ qr = false, text, onCode = handleBarcode, onManual = manualBarcode, manualLabel = 'Nummer eintippen' } = {}) {
   if (!navigator.mediaDevices?.getUserMedia) { onManual(); return; }
   const el = document.createElement('div'); el.className = 'scanner' + (qr ? ' qr' : '');
@@ -1538,7 +1537,7 @@ function showLock(st) {
         <span class="lk-badge" id="lockBadge"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 10V7a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><rect x="5" y="10" width="14" height="11" rx="3" fill="currentColor"/></svg></span></div>
       <h2 class="lk-in" style="animation-delay:.25s">${esc(st.titel || 'Biss ist gerade gesperrt')}</h2>
       <p class="lk-in" style="animation-delay:.4s">${esc(st.text || 'Die App wird bald wieder freigegeben. Deine Daten bleiben erhalten.')}</p>
-      <form class="lk-code lk-in" id="lockForm" style="animation-delay:.5s" autocomplete="off"><input id="lockCode" type="text" placeholder="Zugangscode" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="go" aria-label="Zugangscode"><button type="button" class="lk-scan" id="lockScan" aria-label="Code scannen">📷</button><button type="submit">Öffnen</button></form>
+      <form class="lk-code lk-in" id="lockForm" style="animation-delay:.5s" autocomplete="off"><input id="lockCode" type="text" placeholder="Zugangscode" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="go" aria-label="Zugangscode"><button type="submit">Öffnen</button></form>
       <div class="lk-game lk-in" style="animation-delay:.55s"><b id="lockReps">0</b><span>Wiederholungen</span><small id="lockBest">${best ? `Rekord: ${best}` : 'Tipp aufs Icon und stemm die Hantel 💪'}</small></div>
     </div>`;
   // Minispiel: jedes Tippen aufs Icon ist eine Wiederholung
@@ -1566,8 +1565,6 @@ function showLock(st) {
       toast('Falscher Code'); inp.select();
     }
   });
-  $('#lockScan', el).addEventListener('click', () => openScanner({ qr: true, text: 'Zugangscode in den Rahmen halten', manualLabel: 'Doch eintippen', onManual: () => $('#lockCode', el).focus(),
-    onCode: c => { $('#lockCode', el).value = c; $('#lockForm', el).requestSubmit(); } }));
   // Für den Besitzer: 7× aufs Schloss tippen hebt die Sperre auf diesem Gerät auf
   let taps = 0, tT;
   $('#lockBadge', el).addEventListener('click', () => {

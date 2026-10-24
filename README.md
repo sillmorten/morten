@@ -31,6 +31,6 @@ Icons: [Phosphor Icons](https://phosphoricons.com) (MIT). Barcode: [ZXing](https
 ## App sperren
 In `status.json` steuert `"gesperrt": true` einen Sperr-Bildschirm für alle Nutzer, `false` gibt die App wieder frei.
 Titel und Text lassen sich dort ebenfalls ändern. Die Daten auf den Geräten bleiben unberührt.
-Wer den Zugangscode eingibt oder als QR-Code scannt, kommt trotz Sperre in die App (Hash `ACCESS_HASH` in `app.js`; neuer Code sperrt alle Geräte wieder).
+Wer den Zugangscode eingibt, kommt trotz Sperre in die App (Hash `ACCESS_HASH` in `app.js`; neuer Code sperrt alle Geräte wieder).
 Auf dem eigenen Gerät hebt 7× Tippen aufs Schloss im Sperr-Bildschirm die Sperre dauerhaft auf. Tippen aufs Icon ist ein kleines Hantel-Minispiel.
 
