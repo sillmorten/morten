@@ -29,17 +29,17 @@ const DONATE_URL = 'https://paypal.me/MortenUkena';
 // Verbesserungswünsche gehen über Formspree direkt an den Entwickler. Leer lassen, um den Eintrag auszublenden.
 const WISH_URL = 'https://formspree.io/f/xeepbyjn';
 // Versionsnummer für die Anzeige in der App. Bei jedem Update zusammen mit VERSION in sw.js hochzählen.
-const APP_VERSION = '1.11.0';
+const APP_VERSION = '1.12.0';
 const KEY = 'kalorien.v1';
 const DEFAULTS = () => ({
-  v: 1, setup: false, name: '', points: 0, usedCodes: [], greeted: false, goals: { kcal: 2500, c: 280, p: 150, f: 80 }, weightKg: 80, days: {}, foods: {}, weights: [], lastBackup: null,
+  v: 1, setup: false, name: '', greeted: false, goals: { kcal: 2500, c: 280, p: 150, f: 80 }, weightKg: 80, days: {}, foods: {}, weights: [], lastBackup: null,
   supps: [{ id: 'kreatin', name: 'Kreatin', dose: '5 g' }, { id: 'shake', name: 'Protein-Shake', dose: '' }, { id: 'vitamine', name: 'Vitamine', dose: '' }],
   suppLog: {}, body: [], photos: [], badges: null, profile: null,
 });
 // Ältere Speicherstände und Backups bekommen fehlende Felder mit Standardwerten
 function normalize(o) {
   const d = DEFAULTS(), s = { ...d, ...o, goals: { ...d.goals, ...(o.goals || {}) } };
-  for (const k of ['weights', 'supps', 'body', 'photos', 'usedCodes']) if (!Array.isArray(s[k])) s[k] = d[k];
+  for (const k of ['weights', 'supps', 'body', 'photos']) if (!Array.isArray(s[k])) s[k] = d[k];
   for (const k of ['days', 'foods', 'suppLog']) if (!s[k] || typeof s[k] !== 'object') s[k] = {};
   if (s.badges && typeof s.badges !== 'object') s.badges = null;
   return s;
@@ -385,10 +385,7 @@ function viewGoals() {
     <button class="it" data-act="ownFoods">${tile('pencil', ['#a1a1a6', '#6e6e73'])}<div class="n"><b>Eigene Lebensmittel</b><span>${Object.values(S.foods).length} gespeichert</span></div><span class="chev">${icon('right')}</span></button>
   </section>
   <div class="hdr"><span>Teilen</span></div>
-  <section class="list icons"><button class="it" data-act="shareApp">${tile('share', ['#ff6b8a', '#e3123f'])}<div class="n"><b>App teilen</b><span>QR-Code zeigen, Punkte sammeln</span></div><span class="chev">${icon('right')}</span></button>
-    ${WISH_URL ? (S.referredBy ? `<div class="it">${tile('trophy', ['#ffd60a', '#f5a300'])}<div class="n"><b>Geworben von</b><span>${esc(S.referredBy)}</span></div></div>` : `<button class="it" data-act="referral">${tile('trophy', ['#ffd60a', '#f5a300'])}<div class="n"><b>Wer hat dich geworben?</b><span>Die Person bekommt dafür Punkte</span></div><span class="chev">${icon('right')}</span></button>`) : ''}
-    <button class="it" data-act="points">${tile('medal', ['#ff9f0a', '#f56300'])}<div class="n"><b>Meine Punkte</b><span>${n0(S.points || 0)} Punkte${pointBadge() ? ' · ' + pointBadge().name : ''} · Code einlösen</span></div><span class="chev">${icon('right')}</span></button>
-    ${isOwner() ? `<button class="it" data-act="givePoints">${tile('starF', ['#30d158', '#1a9e3f'])}<div class="n"><b>Punkte vergeben</b><span>Nur für dich: Code für einen Werber erstellen</span></div><span class="chev">${icon('right')}</span></button>` : ''}</section>
+  <section class="list icons"><button class="it" data-act="shareApp">${tile('share', ['#ff6b8a', '#e3123f'])}<div class="n"><b>App teilen</b><span>QR-Code zum Scannen zeigen</span></div><span class="chev">${icon('right')}</span></button></section>
   ${WISH_URL ? `<div class="hdr"><span>Feedback</span></div>
   <section class="list icons"><button class="it" data-act="wish">${tile('sparkle', ['#ffd60a', '#f5a300'])}<div class="n"><b>Wunsch senden 💡</b><span>Was fehlt dir? Sag’s dem Entwickler</span></div><span class="chev">${icon('right')}</span></button></section>` : ''}
   ${DONATE_URL ? `<div class="hdr"><span>Unterstützen</span></div>
@@ -397,7 +394,7 @@ function viewGoals() {
   <section class="list"><button class="it danger" data-act="wipe">Alle Daten löschen</button></section>
   ${(lockState() || {}).gesperrt && lockBypassed() ? `<div class="hdr"><span>Sperre</span></div>
   <section class="list icons"><button class="it" data-act="lockPreview">${tile('warn', ['#ff6b8a', '#e3123f'])}<div class="n"><b>Auf diesem Handy sperren</b><span>Wieder rein nur mit Zugangscode</span></div><span class="chev">${icon('right')}</span></button></section>` : ''}
-  <p class="ver" data-act="verTap">Biss · Version ${APP_VERSION}${isOwner() ? ' · Besitzer' : ''}</p>`;
+  <p class="ver">Biss · Version ${APP_VERSION}</p>`;
 }
 
 /* ---------- Ebenen (Sheets und Seiten) ---------- */
@@ -708,7 +705,7 @@ function loadZXing() {
     sc.onload = ok; sc.onerror = () => { zxingP = null; no(new Error('ZXing')); }; document.head.appendChild(sc);
   });
 }
-// qr: QR-Codes (Zugangs- und Punkte-Codes) statt Barcodes auf Verpackungen
+// qr: QR-Codes (Zugangscode) statt Barcodes auf Verpackungen
 async function openScanner({ qr = false, text, onCode = handleBarcode, onManual = manualBarcode, manualLabel = 'Nummer eintippen' } = {}) {
   if (!navigator.mediaDevices?.getUserMedia) { onManual(); return; }
   const el = document.createElement('div'); el.className = 'scanner' + (qr ? ' qr' : '');
@@ -742,13 +739,6 @@ async function openScanner({ qr = false, text, onCode = handleBarcode, onManual 
     toast(e && e.name === 'NotAllowedError' ? 'Kein Kamerazugriff. Erlaube die Kamera in den Einstellungen.' : 'Kamera konnte nicht gestartet werden');
     onManual();
   }
-}
-// QR-Code als SVG (für Punkte-Codes zum Abscannen)
-async function qrSvg(text) {
-  await loadZXing();
-  const svg = new ZXing.BrowserQRCodeSvgWriter().write(text, 220, 220);
-  svg.setAttribute('viewBox', `0 0 220 220`); svg.style.cssText = 'width:200px;height:200px;display:block;margin:0 auto';
-  return svg.outerHTML;
 }
 function manualBarcode() {
   openLayer('sheet', `
@@ -824,7 +814,6 @@ function openShare() {
       <li>Link in <b>Safari</b> öffnen.</li>
       <li><b>Teilen</b> → <b>Zum Home-Bildschirm</b>.</li>
     </ol></section>
-    ${WISH_URL ? `<p class="note">🏆 Punkte sammeln: Sag deinen Freunden, dass sie beim ersten Start <b>${esc(S.name || 'deinen Namen')}</b> als Empfehlung eintragen.</p>` : ''}
     <button class="btn" data-act="shareLink">Link senden</button>`);
 }
 async function shareLink() {
@@ -1181,137 +1170,6 @@ function openWish() {
   });
 }
 
-/* ---------- Empfehlungen ---------- */
-// Meldet einmalig per Formspree, wer diese Person geworben hat. Klappt es nicht, wird es beim nächsten Start nachgeholt.
-async function sendReferral() {
-  if (!WISH_URL || !S.referredBy || S.refSent || !navigator.onLine) return false;
-  try {
-    const r = await fetch(WISH_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ name: S.name || 'Ohne Namen', geworben_von: S.referredBy, message: `${S.name || 'Jemand'} wurde von ${S.referredBy} geworben.`, version: APP_VERSION, _subject: `Biss – Empfehlung: ${S.referredBy} hat ${S.name || 'jemanden'} geworben` }),
-    });
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    S.refSent = true; save(); return true;
-  } catch (e) { return false; }
-}
-function openReferral() {
-  openLayer('sheet', `<div id="refBody" style="display:flex;flex-direction:column;gap:14px"></div>`, el => {
-    const body = $('#refBody', el);
-    body.innerHTML = `
-      <div class="sh"><div class="t"><b>Wer hat dich geworben?</b><span>Die Person bekommt dafür Punkte</span></div><button class="xb" data-act="close" aria-label="Schließen">${icon('x')}</button></div>
-      <section class="list"><div class="row-in"><input id="refName" class="wide" style="text-align:left" placeholder="Name" autocapitalize="words" enterkeyhint="send" aria-label="Name"></div></section>
-      <button class="btn" id="refOk">Absenden</button>
-      <p class="note">Mitgeschickt werden nur dein Name${S.name ? ` (${esc(S.name)})` : ''} und der Name, den du einträgst. Das geht nur einmal.</p>`;
-    const inp = $('#refName', el), ok = $('#refOk', el);
-    setTimeout(() => inp.focus(), 350);
-    const send = async () => {
-      const ref = inp.value.trim().slice(0, 40);
-      if (!ref) { toast('Wer hat dir Biss empfohlen?'); inp.focus(); return; }
-      if (!navigator.onLine) { toast('Kein Internet. Versuch es später nochmal.'); return; }
-      ok.disabled = true; ok.textContent = 'Wird gesendet …';
-      S.referredBy = ref; S.refSent = false; save();
-      if (await sendReferral()) {
-        buzz(); render();
-        body.innerHTML = `<div class="hello"><div style="font-size:56px;line-height:1.1">🤝</div><h2>Danke!</h2><p>${esc(ref)} bekommt Punkte dafür, dass Biss bei dir gelandet ist.</p></div><button class="btn" data-act="close">Fertig</button>`;
-      } else {
-        delete S.referredBy; save();
-        ok.disabled = false; ok.textContent = 'Nochmal versuchen';
-        toast('Senden hat nicht geklappt. Versuch es gleich nochmal.');
-      }
-    };
-    ok.addEventListener('click', send);
-    inp.addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); send(); } });
-  });
-}
-
-/* ---------- Punkte ---------- */
-// Punkte-Codes ohne Server: Der Besitzer erstellt einen Code für einen Namen, der Werber löst ihn einmal ein.
-// Format P<Punkte>-<Zufall>-<Prüfsumme>. Die Prüfsumme hängt am Namen, damit nur die richtige Person den Code nutzen kann.
-const PT_SALT = 'biss-punkte-2026';
-const PT_BADGES = [[1000, 'Gold-Werber 🥇'], [500, 'Silber-Werber 🥈'], [100, 'Bronze-Werber 🥉']];
-const pointBadge = () => { const b = PT_BADGES.find(([n]) => (S.points || 0) >= n); return b ? { min: b[0], name: b[1] } : null; };
-const isOwner = () => lsGet(OWNER_KEY) === '1';
-const B32 = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-function ptHash(str) {
-  let h = 0x811c9dc5;
-  for (const ch of str) { h ^= ch.codePointAt(0); h = Math.imul(h, 0x01000193) >>> 0; }
-  let o = ''; for (let i = 0; i < 5; i++) { o += B32[h & 31]; h >>>= 5; } return o;
-}
-const ptName = n => String(n || '').trim().toLowerCase();
-function makeCode(name, pts) {
-  let nonce = ''; for (let i = 0; i < 4; i++) nonce += B32[Math.floor(Math.random() * 32)];
-  return `P${pts}-${nonce}-${ptHash(PT_SALT + '|' + ptName(name) + '|' + pts + '|' + nonce)}`;
-}
-function redeemCode(raw) {
-  const m = String(raw).toUpperCase().replace(/\s+/g, '').match(/^P(\d{1,4})-([A-Z2-9]{4})-([A-Z2-9]{5})$/);
-  if (!m) return { err: 'Das ist kein gültiger Punkte-Code' };
-  const [, pts, nonce, sig] = m, code = `P${pts}-${nonce}-${sig}`;
-  if ((S.usedCodes || []).includes(code)) return { err: 'Diesen Code hast du schon eingelöst' };
-  if (ptHash(PT_SALT + '|' + ptName(S.name) + '|' + pts + '|' + nonce) !== sig) return { err: `Dieser Code gehört zu einem anderen Namen. Dein Name in Biss: ${S.name || 'nicht gesetzt'}` };
-  S.usedCodes = [...(S.usedCodes || []), code]; S.points = (S.points || 0) + +pts; save();
-  return { pts: +pts };
-}
-function openPoints() {
-  openLayer('sheet', `<div id="ptBody" style="display:flex;flex-direction:column;gap:14px"></div>`, el => {
-    const body = $('#ptBody', el);
-    const draw = () => {
-      const b = pointBadge(), next = [...PT_BADGES].reverse().find(([n]) => (S.points || 0) < n);
-      body.innerHTML = `
-        <div class="sh"><div class="t"><b>Meine Punkte</b><span>Fürs Weiterempfehlen von Biss</span></div><button class="xb" data-act="close" aria-label="Schließen">${icon('x')}</button></div>
-        <div class="hello"><div style="font-size:56px;line-height:1.1">${b ? b.name.slice(-2) : '🏆'}</div><h2 class="num">${n0(S.points || 0)} Punkte</h2>
-          <p>${b ? b.name : 'Noch kein Abzeichen'}${next ? ` · noch ${n0(next[0] - (S.points || 0))} bis ${next[1]}` : ''}</p></div>
-        <section class="list"><div class="row-in"><input id="ptCode" class="wide" style="text-align:left;text-transform:uppercase" placeholder="Code, z. B. P100-AB3C-XY7Z9" autocapitalize="characters" autocomplete="off" spellcheck="false" enterkeyhint="done" aria-label="Punkte-Code"></div></section>
-        <div style="display:flex;gap:10px"><button class="btn" id="ptScan" style="background:var(--g2);color:var(--tint)">📷 Scannen</button><button class="btn" id="ptOk">Einlösen</button></div>
-        <p class="note">So gibt’s Punkte: Freunde tragen beim ersten Start <b>${esc(S.name || 'deinen Namen')}</b> als Empfehlung ein. Du bekommst dann vom Entwickler einen Code.</p>`;
-      const inp = $('#ptCode', el);
-      const go = () => {
-        const r = redeemCode(inp.value);
-        if (r.err) { toast(r.err); inp.focus(); return; }
-        buzz(); confetti(); render(); draw(); toast(`+${n0(r.pts)} Punkte 🏆`);
-      };
-      $('#ptOk', el).addEventListener('click', go);
-      $('#ptScan', el).addEventListener('click', () => openScanner({ qr: true, text: 'Punkte-Code in den Rahmen halten', manualLabel: 'Doch eintippen', onManual: () => inp.focus(), onCode: c => { inp.value = c; go(); } }));
-      inp.addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); go(); } });
-    };
-    draw();
-  });
-}
-function openGivePoints() {
-  openLayer('sheet', `<div id="gpBody" style="display:flex;flex-direction:column;gap:14px"></div>`, el => {
-    const body = $('#gpBody', el);
-    let pts = 100;
-    body.innerHTML = `
-      <div class="sh"><div class="t"><b>Punkte vergeben</b><span>Code für einen Werber erstellen</span></div><button class="xb" data-act="close" aria-label="Schließen">${icon('x')}</button></div>
-      <section class="list"><div class="row-in"><input id="gpName" class="wide" style="text-align:left" placeholder="Name des Werbers, genau wie in seiner App" autocapitalize="words" aria-label="Name des Werbers"></div></section>
-      <div class="chips" id="gpPts">${[50, 100, 250, 500].map(n => `<button class="chip${n === pts ? ' on' : ''}" data-v="${n}">${n} Punkte</button>`).join('')}</div>
-      <button class="btn" id="gpOk">Code erstellen und senden</button>
-      <div id="gpOut"></div>`;
-    $('#gpPts', el).querySelectorAll('[data-v]').forEach(b => b.addEventListener('click', () => {
-      pts = +b.dataset.v; $('#gpPts', el).querySelectorAll('.chip').forEach(c => c.classList.toggle('on', c === b));
-    }));
-    $('#gpOk', el).addEventListener('click', async () => {
-      const name = $('#gpName', el).value.trim();
-      if (!name) { toast('Für wen ist der Code?'); $('#gpName', el).focus(); return; }
-      const code = makeCode(name, pts);
-      const msg = `Hey ${name}, danke fürs Weiterempfehlen! Du bekommst ${pts} Biss-Punkte 🏆\nÖffne Biss → Ziele → Meine Punkte und gib diesen Code ein:\n${code}`;
-      $('#gpOut', el).innerHTML = `<section class="card" style="text-align:center"><div class="note" style="margin-bottom:6px">Code für ${esc(name)} · zum Abscannen oder Abtippen</div><div id="gpQr" style="background:#fff;border-radius:12px;padding:8px;margin:4px auto 8px;width:fit-content"></div><div style="font-size:24px;font-weight:700;letter-spacing:.04em;user-select:all">${code}</div></section>`;
-      qrSvg(code).then(h => { const q = $('#gpQr', el); if (q) q.innerHTML = h; }).catch(() => { const q = $('#gpQr', el); if (q) q.remove(); });
-      try { if (navigator.share) { await navigator.share({ text: msg }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
-      try { await navigator.clipboard.writeText(msg); toast('Nachricht kopiert'); } catch (e) { /* Code steht ja da */ }
-    });
-  });
-}
-let verTaps = 0, verT;
-function verTap() {
-  clearTimeout(verT); verT = setTimeout(() => { verTaps = 0; }, 2000);
-  if (++verTaps < 7) return;
-  verTaps = 0;
-  if (isOwner()) { try { localStorage.removeItem(OWNER_KEY); } catch (e) { /* egal */ } toast('Besitzer-Modus aus'); }
-  else { lsSet(OWNER_KEY, '1'); toast('Besitzer-Modus an'); }
-  render();
-}
-
 /* ---------- Backup ---------- */
 let bkPhotos = null;
 function openBackup() {
@@ -1502,23 +1360,15 @@ function openWelcome() {
         <p>Schön, dass du da bist. Wie heißt du?</p>
       </div>
       <section class="list"><div class="row-in"><input id="wcName" class="wide" style="text-align:left" placeholder="Dein Vorname" autocapitalize="words" autocomplete="given-name" enterkeyhint="next" aria-label="Dein Vorname"></div></section>
-      ${S.referredBy ? '' : `<div class="hdr"><span>Wer hat dir Biss empfohlen?</span></div>
-      <section class="list"><div class="row-in"><input id="wcRef" class="wide" style="text-align:left" placeholder="Name, optional" autocapitalize="words" enterkeyhint="next" aria-label="Wer hat dir Biss empfohlen?"></div></section>
-      <p class="note" style="margin-top:-6px">Dann bekommt die Person Punkte fürs Weiterempfehlen.</p>`}
       <button class="btn" id="wcNext">Weiter</button>`;
-    const inp = $('#wcName', el), refInp = $('#wcRef', el);
+    const inp = $('#wcName', el);
     const next = () => {
       const name = inp.value.trim().slice(0, 30);
       if (!name) { toast('Wie heißt du?'); inp.focus(); return; }
-      S.name = name;
-      const ref = refInp ? refInp.value.trim().slice(0, 40) : '';
-      if (ref) { S.referredBy = ref; S.refSent = false; }
-      save(); render(); greet();
-      if (ref) sendReferral();
+      S.name = name; save(); render(); greet();
     };
     $('#wcNext', el).addEventListener('click', next);
-    inp.addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); if (refInp) refInp.focus(); else next(); } });
-    if (refInp) refInp.addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); next(); } });
+    inp.addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); next(); } });
   });
 }
 function confetti() {
@@ -1592,10 +1442,6 @@ const ACT = {
   healthHelp: () => openHealthHelp(),
   shareApp: () => openShare(),
   shareLink: () => shareLink(),
-  referral: () => openReferral(),
-  points: () => openPoints(),
-  givePoints: () => openGivePoints(),
-  verTap: () => verTap(),
   lockPreview: () => { lsSet(RELOCK_KEY, '1'); showLock(lockState() || { gesperrt: true }); },
   range: b => { histRange = b.dataset.n; histOff = 0; render(); },
   histStep: b => { histOff = Math.max(0, histOff + +b.dataset.d); render(); },
@@ -1748,7 +1594,6 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 if (!S.badges) { initBadges(); save(); }
 render();
 if (!S.setup || !S.greeted) openWelcome();
-sendReferral();
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 if ('serviceWorker' in navigator && location.protocol === 'https:') {
   // Neue Version: Seite einmal neu laden, sobald der neue Service Worker übernimmt

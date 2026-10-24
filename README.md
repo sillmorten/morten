@@ -34,7 +34,3 @@ Titel und Text lassen sich dort ebenfalls ändern. Die Daten auf den Geräten bl
 Wer den Zugangscode eingibt oder als QR-Code scannt, kommt trotz Sperre in die App (Hash `ACCESS_HASH` in `app.js`; neuer Code sperrt alle Geräte wieder).
 Auf dem eigenen Gerät hebt 7× Tippen aufs Schloss im Sperr-Bildschirm die Sperre dauerhaft auf. Tippen aufs Icon ist ein kleines Hantel-Minispiel.
 
-## Punkte fürs Werben
-7× auf die Versionsnummer unten in „Ziele“ tippen schaltet den Besitzer-Modus an (und wieder aus).
-Dann erscheint „Punkte vergeben“: Name des Werbers eintragen (wie in seiner App), Punkte wählen, Code senden.
-Der Werber löst ihn unter „Ziele → Meine Punkte“ ein, per Eintippen oder durch Scannen des angezeigten QR-Codes. Jeder Code gilt nur für diesen Namen und nur einmal.
