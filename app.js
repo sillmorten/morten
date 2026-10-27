@@ -29,7 +29,7 @@ const DONATE_URL = 'https://paypal.me/MortenUkena';
 // Verbesserungswünsche gehen über Formspree direkt an den Entwickler. Leer lassen, um den Eintrag auszublenden.
 const WISH_URL = 'https://formspree.io/f/xeepbyjn';
 // Versionsnummer für die Anzeige in der App. Bei jedem Update zusammen mit VERSION in sw.js hochzählen.
-const APP_VERSION = '1.19.0';
+const APP_VERSION = '1.20.0';
 const KEY = 'kalorien.v1';
 const DEFAULTS = () => ({
   v: 1, setup: false, name: '', greeted: false, goals: { kcal: 2500, c: 280, p: 150, f: 80 }, weightKg: 80, days: {}, foods: {}, weights: [], lastBackup: null, bkRemind: 7, bkSnooze: 0,
@@ -79,10 +79,11 @@ const MEALS = [
 const norm = s => String(s || '').toLowerCase().replace(/ä/g, 'a').replace(/ö/g, 'o').replace(/ü/g, 'u').replace(/ß/g, 'ss');
 const slug = s => norm(s).replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 const BASE = {};
+const BRANDS = ["McDonald's", 'Pizza Hut', 'Wurst-Basar'];
 for (const [cat, rows] of Object.entries(typeof FOOD_LIST !== 'undefined' ? FOOD_LIST : {})) {
   for (const [name, kcal, c, p, f, pg, pl] of rows) {
     const id = 'base:' + slug(name);
-    BASE[id] = { id, src: 'base', cat, name, brand: cat === "McDonald's" ? cat : '', kcal, c, p, f, portion: pg ? { g: pg, label: `${pl} (${n0(pg)} g)` } : null };
+    BASE[id] = { id, src: 'base', cat, name, brand: BRANDS.includes(cat) ? cat : '', kcal, c, p, f, portion: pg ? { g: pg, label: `${pl} (${n0(pg)} g)`, name: pl } : null };
   }
 }
 const getFood = id => S.foods[id] || BASE[id] || IDEAS.find(i => i.id === id);
@@ -467,9 +468,12 @@ function renderAddBody() {
   if (addCtx.q) {
     const words = norm(addCtx.q).split(/\s+/).filter(Boolean);
     const pool = [...foods, ...Object.values(BASE).filter(b => !S.foods[b.id])];
+    // Einfache Wortstämme, damit „kleine Cola“ oder „Stücke Pizza“ auch passen; Portionsname zählt mit („Scheibe Käse“).
+    const stem = w => w.length > 4 ? w.replace(/(en|e|n|s)$/, '') : w;
     const starts = f => norm(f.name).startsWith(words[0]) ? 0 : 1;
-    const loc = pool.filter(f => { let h = norm(f.name + ' ' + (f.brand || '')); h += ' ' + h.replace(/['’]/g, ''); return words.every(w => h.includes(w)); })
-      .sort((a, b) => (b.used || 0) - (a.used || 0) || starts(a) - starts(b) || a.name.length - b.name.length).slice(0, 30);
+    const inName = f => words.filter(w => norm(f.name).includes(stem(w))).length;
+    const loc = pool.filter(f => { let h = norm(f.name + ' ' + (f.brand || '') + ' ' + (f.portion?.name || '')); h += ' ' + h.replace(/['’\s-]/g, ''); return words.every(w => h.includes(stem(w))); })
+      .sort((a, b) => (b.used || 0) - (a.used || 0) || inName(b) - inName(a) || starts(a) - starts(b) || a.name.length - b.name.length).slice(0, 30);
     if (loc.length) html += `<div class="hdr"><span>Lebensmittel</span></div><section class="list">${loc.map(f => foodRow(f)).join('')}</section>`;
     html += `<div class="hdr"><span>Open Food Facts</span></div>`;
     if (addCtx.loading) html += `<section class="list"><div class="empty"><div class="spin"></div></div></section>`;
@@ -567,6 +571,7 @@ function openAmount(food, { entry = null, day = null, meal = null } = {}) {
   opts.push({ g: 100, l: '100 g' });
   if (f.src === 'idea' && f.portion) opts.push({ g: Math.round(f.portion.g / 2), l: '½ Gericht' }, { g: f.portion.g, l: 'Ganzes Gericht' }, { g: Math.round(f.portion.g * 1.5), l: '1½ Gerichte' });
   else if (f.portion) opts.push({ g: f.portion.g, l: f.portion.label.length > 22 ? `Portion ${n0(f.portion.g)} g` : f.portion.label });
+  if (f.src === 'base' && f.portion?.name && f.portion.name.length <= 12) opts.push({ g: f.portion.g * 2, l: `2 × ${f.portion.name}` }, { g: f.portion.g * 3, l: `3 × ${f.portion.name}` });
   if (f.pack && f.pack !== 100 && (!f.portion || f.pack !== f.portion.g)) opts.push({ g: f.pack, l: `Packung ${n0(f.pack)} g` });
   if (f.lastG && !opts.some(o => o.g === f.lastG)) opts.push({ g: f.lastG, l: `Zuletzt ${n0(f.lastG)} g` });
   openLayer('sheet', `
