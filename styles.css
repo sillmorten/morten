@@ -404,3 +404,7 @@ i.o { background: var(--org); }
 .it.idea .n .fit.ok { color: var(--grn); }
 .it.idea .n .fit.no { color: var(--org); }
 .it.idea .plus { margin-top: 6px; }
+.list.recipe .it { align-items: flex-start; }
+.list.recipe .no { width: 24px; height: 24px; flex: none; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 700; color: #fff; background: var(--tint); margin-top: 1px; }
+.list.recipe .n span { white-space: normal; font-size: 15px; color: var(--l1); line-height: 1.4; margin-top: 2px; }
+.list.recipe .it + .it::before { left: 52px; }

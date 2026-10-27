@@ -29,7 +29,7 @@ const DONATE_URL = 'https://paypal.me/MortenUkena';
 // Verbesserungswünsche gehen über Formspree direkt an den Entwickler. Leer lassen, um den Eintrag auszublenden.
 const WISH_URL = 'https://formspree.io/f/xeepbyjn';
 // Versionsnummer für die Anzeige in der App. Bei jedem Update zusammen mit VERSION in sw.js hochzählen.
-const APP_VERSION = '1.18.0';
+const APP_VERSION = '1.19.0';
 const KEY = 'kalorien.v1';
 const DEFAULTS = () => ({
   v: 1, setup: false, name: '', greeted: false, goals: { kcal: 2500, c: 280, p: 150, f: 80 }, weightKg: 80, days: {}, foods: {}, weights: [], lastBackup: null, bkRemind: 7, bkSnooze: 0,
@@ -707,8 +707,9 @@ const IDEAS = (typeof IDEA_LIST !== 'undefined' ? IDEA_LIST : []).map(([emoji, n
   const g = items.reduce((a, x) => a + x.g, 0), t = { kcal: 0, c: 0, p: 0, f: 0 };
   for (const x of items) { const v = calc(x.f, x.g); for (const k in t) t[k] += v[k]; }
   const per = k => Math.round(t[k] / g * 1000) / 10;
+  const [min, steps] = (typeof IDEA_RECIPES !== 'undefined' && IDEA_RECIPES[name]) || [0, []];
   return { id: 'idea:' + slug(name), src: 'idea', name, brand: '', emoji, meals, goal, total: t, kcal: per('kcal'), c: per('c'), p: per('p'), f: per('f'),
-    portion: { g, label: `Ganzes Gericht (${n0(g)} g)` }, ingr: items.map(x => `${x.f.name} ${n0(x.g)}\u00a0g`).join(' · ') };
+    portion: { g, label: `Ganzes Gericht (${n0(g)} g)` }, ingr: items.map(x => `${x.f.name} ${n0(x.g)}\u00a0g`).join(' · '), parts: items.map(x => [x.f.name, x.g]), min, steps };
 });
 const MEAL_SHARE = { b: .25, l: .35, d: .3, s: .12 };
 let ideaCtx = null;
@@ -736,14 +737,26 @@ function refreshIdeas() {
   const list = IDEAS.filter(i => i.meals.includes(meal) && (i.goal === 'both' || i.goal === goal))
     .map(i => ({ i, fits: i.total.kcal <= Math.max(left, 0) + 30, s: score(i) }))
     .sort((a, c) => (c.fits - a.fits) || a.s - c.s);
-  const row = ({ i, fits }) => `<button class="it idea" data-act="pickIdea" data-id="${esc(i.id)}"><span class="emo">${i.emoji}</span><div class="n"><b>${esc(i.name)}</b><span>${esc(i.ingr)}</span>
-    <span class="im"><b class="num">${n0(i.total.kcal)} kcal</b> · ${n0(i.total.p)} g Eiweiß · ${n0(i.total.c)} g KH · ${n0(i.total.f)} g Fett</span>${left > 0 ? `<span class="fit ${fits ? 'ok' : 'no'}">${fits ? 'Passt noch rein' : `${n0(i.total.kcal - left)} kcal über deinem Ziel`}</span>` : ''}</div><span class="plus">${icon('plus')}</span></button>`;
+  const row = ({ i, fits }) => `<button class="it idea" data-act="recipe" data-id="${esc(i.id)}"><span class="emo">${i.emoji}</span><div class="n"><b>${esc(i.name)}</b><span>${esc(i.ingr)}</span>
+    <span class="im"><b class="num">${n0(i.total.kcal)} kcal</b>${i.min ? ` · ⏱ ${i.min} Min.` : ''} · ${n0(i.total.p)} g Eiweiß · ${n0(i.total.c)} g KH · ${n0(i.total.f)} g Fett</span>${left > 0 ? `<span class="fit ${fits ? 'ok' : 'no'}">${fits ? 'Passt noch rein' : `${n0(i.total.kcal - left)} kcal über deinem Ziel`}</span>` : ''}</div><span class="chev">${icon('right')}</span></button>`;
   b.innerHTML = `<div class="sh"><div class="t"><b>Essensideen</b><span>${left > 0 ? `Noch ${n0(left)} kcal${pLeft > 0 ? ` und ${n0(pLeft)} g Eiweiß` : ''} übrig` : 'Dein Kalorienziel ist für heute erreicht'}</span></div><button class="xb" data-act="close" aria-label="Schließen">${icon('x')}</button></div>
     <div class="seg">${[['lose', 'Abnehmen'], ['gain', 'Zunehmen']].map(([id, l]) => `<button class="${goal === id ? 'on' : ''}" data-act="ideaGoal" data-g="${id}">${l}</button>`).join('')}</div>
     <div class="seg">${MEALS.map(m => `<button class="${meal === m.id ? 'on' : ''}" data-act="ideaMeal" data-meal="${m.id}">${m.id === 's' ? 'Snack' : m.id === 'l' ? 'Mittag' : m.id === 'd' ? 'Abend' : m.name}</button>`).join('')}</div>
-    <p class="note" style="margin:0">${goal === 'gain' ? 'Viele Kalorien, gut zu schaffen und mit genug Eiweiß für die Muskeln.' : 'Macht satt, viel Eiweiß und wenig Kalorien.'} Antippen zum Eintragen, die Menge kannst du anpassen.</p>
+    <p class="note" style="margin:0">${goal === 'gain' ? 'Viele Kalorien, gut zu schaffen und mit genug Eiweiß für die Muskeln.' : 'Macht satt, viel Eiweiß und wenig Kalorien.'} Antippen für Rezept und zum Eintragen.</p>
     <section class="list icons">${list.map(row).join('')}</section>
     <p class="foot">Die Werte sind aus den eingebauten Lebensmitteln berechnet und damit Richtwerte.</p>`;
+}
+
+function openRecipe(i) {
+  const t = i.total;
+  openLayer('sheet', `
+    <div class="sh"><div class="t"><b>${i.emoji} ${esc(i.name)}</b><span>${i.min ? `⏱ ${i.min} Minuten · ` : ''}1 Portion</span></div><button class="xb" data-act="close" aria-label="Schließen">${icon('x')}</button></div>
+    <div class="nut"><div><b class="num">${n0(t.kcal)}</b><span>kcal</span></div><div><b class="num" style="color:var(--org)">${n0(t.c)} g</b><span>KH</span></div><div><b class="num" style="color:var(--grn)">${n0(t.p)} g</b><span>Eiweiß</span></div><div><b class="num" style="color:var(--blu)">${n0(t.f)} g</b><span>Fett</span></div></div>
+    <div class="hdr"><span>Zutaten</span></div>
+    <section class="list">${i.parts.map(([n, g]) => `<div class="it"><div class="n"><b>${esc(n)}</b></div><span class="k num">${n0(g)} g</span></div>`).join('')}</section>
+    ${i.steps.length ? `<div class="hdr"><span>Zubereitung</span></div>
+    <section class="list recipe">${i.steps.map((st, k) => `<div class="it"><span class="no num">${k + 1}</span><div class="n"><span>${esc(st)}</span></div></div>`).join('')}</section>` : ''}
+    <button class="btn" data-act="pickIdea" data-id="${esc(i.id)}">Zu ${esc(mealOf(ideaCtx?.meal || mealByTime()).name)} hinzufügen</button>`);
 }
 
 /* ---------- Barcode-Scanner ---------- */
@@ -1565,7 +1578,8 @@ const ACT = {
   ideas: () => openIdeas(addCtx?.meal),
   ideaGoal: b => { S.ideaGoal = b.dataset.g; save(); refreshIdeas(); },
   ideaMeal: b => { ideaCtx.meal = b.dataset.meal; refreshIdeas(); },
-  pickIdea: b => { const f = getFood(b.dataset.id); if (f) openAmount(S.foods[f.id] ? { ...f, fav: S.foods[f.id].fav, lastG: S.foods[f.id].lastG } : f, { meal: ideaCtx.meal, day: ideaCtx.day }); },
+  recipe: b => { const i = IDEAS.find(x => x.id === b.dataset.id); if (i) openRecipe(i); },
+  pickIdea: b => { const f = getFood(b.dataset.id); if (f) openAmount(S.foods[f.id] ? { ...f, fav: S.foods[f.id].fav, lastG: S.foods[f.id].lastG } : f, { meal: ideaCtx?.meal || mealByTime(), day: ideaCtx?.day || cur }); },
   editEntry: b => {
     const e = getDay(mealSheet.day).food.find(x => x.id === b.dataset.id); if (!e) return;
     if (!e.foodId) { editQuick(e, mealSheet.day); return; }
