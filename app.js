@@ -29,7 +29,7 @@ const DONATE_URL = 'https://paypal.me/MortenUkena';
 // Verbesserungswünsche gehen über Formspree direkt an den Entwickler. Leer lassen, um den Eintrag auszublenden.
 const WISH_URL = 'https://formspree.io/f/xeepbyjn';
 // Versionsnummer für die Anzeige in der App. Bei jedem Update zusammen mit VERSION in sw.js hochzählen.
-const APP_VERSION = '1.13.0';
+const APP_VERSION = '1.14.0';
 const KEY = 'kalorien.v1';
 const DEFAULTS = () => ({
   v: 1, setup: false, name: '', greeted: false, goals: { kcal: 2500, c: 280, p: 150, f: 80 }, weightKg: 80, days: {}, foods: {}, weights: [], lastBackup: null,
@@ -393,7 +393,7 @@ function viewGoals() {
   <p class="foot">Alle Daten bleiben auf diesem Gerät. Es gibt kein Konto und keine Werbung. Eingebaute Lebensmittel sind Richtwerte. Die Online-Suche und der Barcode-Scan nutzen Open Food Facts (offene Datenbank, ODbL).</p>
   <section class="list"><button class="it danger" data-act="wipe">Alle Daten löschen</button></section>
   ${(lockState() || {}).gesperrt && lockBypassed() ? `<div class="hdr"><span>Sperre</span></div>
-  <section class="list icons"><button class="it" data-act="lockPreview">${tile('warn', ['#ff6b8a', '#e3123f'])}<div class="n"><b>Auf diesem Handy sperren</b><span>Wieder rein nur mit Zugangscode</span></div><span class="chev">${icon('right')}</span></button></section>` : ''}
+  <section class="list icons"><button class="it" data-act="lockPreview">${tile('warn', ['#ff6b8a', '#e3123f'])}<div class="n"><b>Auf diesem Handy sperren</b><span>Wieder rein: 7× auf „Biss · Wartung“ tippen</span></div><span class="chev">${icon('right')}</span></button></section>` : ''}
   <p class="ver">Biss · Version ${APP_VERSION}</p>`;
 }
 
@@ -1510,21 +1510,18 @@ document.addEventListener('visibilitychange', () => {
 /* ---------- Sperre ---------- */
 // status.json im Repo steuert, ob die App gesperrt ist ("gesperrt": true/false).
 // Der letzte bekannte Stand wird gemerkt, damit die Sperre auch offline gilt. Die Daten bleiben unberührt.
-const LOCK_KEY = 'biss.lock', OWNER_KEY = 'biss.owner', ACCESS_KEY = 'biss.access';
-// SHA-256 des Zugangscodes (klein geschrieben). Neuer Code = neuer Hash, dann sind alle Geräte wieder gesperrt.
-const ACCESS_HASH = '73887ad2ebd766a3876b21123636213a62ffd820ab061a7b5a5c6180c693305b';
-async function sha256(t) { const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(t)); return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, '0')).join(''); }
+const LOCK_KEY = 'biss.lock', OWNER_KEY = 'biss.owner';
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* egal */ } };
 let lockSig = '';
 const RELOCK_KEY = 'biss.relock';
-// Wieder gesperrt (über „Sperr-Seite ansehen“): dann hilft nur noch der Zugangscode
+// Auf diesem Handy wieder gesperrt (über „Auf diesem Handy sperren“): 7× tippen hebt das wieder auf
 const relocked = () => lsGet(RELOCK_KEY) === '1';
-const lockBypassed = () => !relocked() && (lsGet(OWNER_KEY) === '1' || lsGet(ACCESS_KEY) === ACCESS_HASH);
+const lockBypassed = () => !relocked() && lsGet(OWNER_KEY) === '1';
 const lockState = () => { try { return JSON.parse(lsGet(LOCK_KEY) || 'null'); } catch (e) { return null; } };
 let lockTick = 0;
 function hideLock(el) { clearInterval(lockTick); if (el) el.remove(); lockSig = ''; }
-// Edle Wartungs-Seite: filmischer Hintergrund, Statuszeile, Zugangscode
+// Edle Wartungs-Seite: filmischer Hintergrund, Statuszeile, Backup-Knopf
 function showLock(st) {
   let el = $('#lock');
   if (!st || !st.gesperrt || lockBypassed()) { hideLock(el); return; }
@@ -1541,8 +1538,8 @@ function showLock(st) {
       <p class="mx-sub mx-in" style="animation-delay:.6s">${esc(st.text || 'Wir machen Biss gerade noch besser. Gleich geht’s weiter.')}</p>
       <div class="mx-bar mx-in" style="animation-delay:.75s"><i></i></div>
       <div class="mx-step mx-in" style="animation-delay:.85s"><span id="lockStep">${esc(STEPS[0])}</span></div>
-      <form class="mx-code mx-in" id="lockForm" style="animation-delay:1s" autocomplete="off"><input id="lockCode" type="text" placeholder="Zugangscode" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="go" aria-label="Zugangscode"><button type="submit">Öffnen</button></form>
-      <p class="mx-foot mx-in" style="animation-delay:1.15s">Deine Daten bleiben sicher auf deinem iPhone.</p>
+      <button class="mx-backup mx-in" id="lockBackup" style="animation-delay:1s"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0-4.5-4.5M12 15l4.5-4.5M5 19h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Backup aufs Handy speichern</button>
+      <p class="mx-foot mx-in" style="animation-delay:1.15s">Deine Daten bleiben sicher auf deinem iPhone.<br>Mit dem Backup hast du zusätzlich eine Kopie als Datei.</p>
     </div>`;
   // Statuszeile wechselt sanft
   clearInterval(lockTick);
@@ -1551,25 +1548,15 @@ function showLock(st) {
     stepEl.classList.add('out');
     setTimeout(() => { si = (si + 1) % STEPS.length; stepEl.textContent = STEPS[si]; stepEl.classList.remove('out'); }, 450);
   }, 3200);
-  // Zugangscode: richtiger Code schaltet dieses Gerät frei
-  $('#lockForm', el).addEventListener('submit', async ev => {
-    ev.preventDefault();
-    const inp = $('#lockCode', el), code = inp.value.trim().toLowerCase();
-    if (!code) { inp.focus(); return; }
-    if (await sha256(code) === ACCESS_HASH) {
-      lsSet(ACCESS_KEY, ACCESS_HASH); try { localStorage.removeItem(RELOCK_KEY); } catch (e) { /* egal */ } inp.blur(); buzz();
-      el.classList.add('mx-out'); setTimeout(() => { hideLock(el); confetti(); toast('Willkommen in Biss! 🎉'); render(); }, 700);
-    } else {
-      const f = $('#lockForm', el); f.classList.remove('mx-no'); void f.offsetWidth; f.classList.add('mx-no');
-      toast('Falscher Code'); inp.select();
-    }
-  });
+  // Backup: Fotos vorab laden, damit „Teilen“ direkt nach dem Tippen startet (iOS verlangt das)
+  bkPhotos = S.photos.length ? loadAllPhotos() : Promise.resolve({});
+  bkPhotos.then(p => { bkPhotos.done = p; }).catch(() => { bkPhotos.done = {}; });
+  $('#lockBackup', el).addEventListener('click', () => exportBackup());
   // Für den Besitzer: 7× auf „Biss · Wartung“ tippen hebt die Sperre auf diesem Gerät auf
   let taps = 0, tT;
   $('#lockBadge', el).addEventListener('click', () => {
     clearTimeout(tT); tT = setTimeout(() => { taps = 0; }, 2000);
-    if (relocked()) return; // selbst gesperrt: nur der Zugangscode hilft
-    if (++taps >= 7) { lsSet(OWNER_KEY, '1'); hideLock(el); toast('Sperre auf diesem Gerät aufgehoben'); render(); }
+    if (++taps >= 7) { try { localStorage.removeItem(RELOCK_KEY); } catch (e) { /* egal */ } lsSet(OWNER_KEY, '1'); hideLock(el); toast('Sperre auf diesem Gerät aufgehoben'); render(); }
   });
 }
 async function checkLock() {
