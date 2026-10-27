@@ -16,6 +16,7 @@ Alle Daten bleiben lokal auf dem Gerät (localStorage). Lebensmittel kommen von
 - Streaks und Abzeichen (Tage im Ziel, Tage eingetragen, Eiweiß, Supplements)
 - Körpermaße mit Verlauf und Fortschrittsfotos (verkleinert in IndexedDB, im Backup enthalten)
 - Supplement-Tracker zum täglichen Abhaken, frei einstellbar
+- Essensideen zum Abnehmen oder Zunehmen (`ideas.js`), sortiert nach den übrigen Kalorien und dem Eiweiß des Tages, mit einem Tipp eintragbar
 - Verbesserungswünsche direkt aus der App an den Entwickler senden (Formspree)
 
 ## Installation auf dem iPhone
