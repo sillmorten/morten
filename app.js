@@ -29,7 +29,7 @@ const DONATE_URL = 'https://paypal.me/MortenUkena';
 // Verbesserungswünsche gehen über Formspree direkt an den Entwickler. Leer lassen, um den Eintrag auszublenden.
 const WISH_URL = 'https://formspree.io/f/xeepbyjn';
 // Versionsnummer für die Anzeige in der App. Bei jedem Update zusammen mit VERSION in sw.js hochzählen.
-const APP_VERSION = '1.14.0';
+const APP_VERSION = '1.14.1';
 const KEY = 'kalorien.v1';
 const DEFAULTS = () => ({
   v: 1, setup: false, name: '', greeted: false, goals: { kcal: 2500, c: 280, p: 150, f: 80 }, weightKg: 80, days: {}, foods: {}, weights: [], lastBackup: null,
@@ -1521,7 +1521,7 @@ const lockBypassed = () => !relocked() && lsGet(OWNER_KEY) === '1';
 const lockState = () => { try { return JSON.parse(lsGet(LOCK_KEY) || 'null'); } catch (e) { return null; } };
 let lockTick = 0;
 function hideLock(el) { clearInterval(lockTick); if (el) el.remove(); lockSig = ''; }
-// Edle Wartungs-Seite: filmischer Hintergrund, Statuszeile, Backup-Knopf
+// Edle Wartungs-Seite: filmischer Hintergrund und Statuszeile
 function showLock(st) {
   let el = $('#lock');
   if (!st || !st.gesperrt || lockBypassed()) { hideLock(el); return; }
@@ -1538,8 +1538,7 @@ function showLock(st) {
       <p class="mx-sub mx-in" style="animation-delay:.6s">${esc(st.text || 'Wir machen Biss gerade noch besser. Gleich geht’s weiter.')}</p>
       <div class="mx-bar mx-in" style="animation-delay:.75s"><i></i></div>
       <div class="mx-step mx-in" style="animation-delay:.85s"><span id="lockStep">${esc(STEPS[0])}</span></div>
-      <button class="mx-backup mx-in" id="lockBackup" style="animation-delay:1s"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0-4.5-4.5M12 15l4.5-4.5M5 19h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Backup aufs Handy speichern</button>
-      <p class="mx-foot mx-in" style="animation-delay:1.15s">Deine Daten bleiben sicher auf deinem iPhone.<br>Mit dem Backup hast du zusätzlich eine Kopie als Datei.</p>
+      <p class="mx-foot mx-in" style="animation-delay:1.15s">Deine Daten bleiben sicher auf deinem iPhone.</p>
     </div>`;
   // Statuszeile wechselt sanft
   clearInterval(lockTick);
@@ -1548,10 +1547,6 @@ function showLock(st) {
     stepEl.classList.add('out');
     setTimeout(() => { si = (si + 1) % STEPS.length; stepEl.textContent = STEPS[si]; stepEl.classList.remove('out'); }, 450);
   }, 3200);
-  // Backup: Fotos vorab laden, damit „Teilen“ direkt nach dem Tippen startet (iOS verlangt das)
-  bkPhotos = S.photos.length ? loadAllPhotos() : Promise.resolve({});
-  bkPhotos.then(p => { bkPhotos.done = p; }).catch(() => { bkPhotos.done = {}; });
-  $('#lockBackup', el).addEventListener('click', () => exportBackup());
   // Für den Besitzer: 7× auf „Biss · Wartung“ tippen hebt die Sperre auf diesem Gerät auf
   let taps = 0, tT;
   $('#lockBadge', el).addEventListener('click', () => {

@@ -31,6 +31,6 @@ Icons: [Phosphor Icons](https://phosphoricons.com) (MIT). Barcode: [ZXing](https
 ## App sperren
 In `status.json` steuert `"gesperrt": true` einen Sperr-Bildschirm für alle Nutzer, `false` gibt die App wieder frei.
 Titel und Text lassen sich dort ebenfalls ändern. Die Daten auf den Geräten bleiben unberührt.
-Auf der Wartungs-Seite kann jeder ein Backup aufs Handy speichern. Einen Zugangscode gibt es nicht.
+Einen Zugangscode gibt es nicht.
 Auf dem eigenen Gerät hebt 7× Tippen auf „Biss · Wartung“ im Sperr-Bildschirm die Sperre dauerhaft auf.
 
