@@ -29,10 +29,10 @@ const DONATE_URL = 'https://paypal.me/MortenUkena';
 // Verbesserungswünsche gehen über Formspree direkt an den Entwickler. Leer lassen, um den Eintrag auszublenden.
 const WISH_URL = 'https://formspree.io/f/xeepbyjn';
 // Versionsnummer für die Anzeige in der App. Bei jedem Update zusammen mit VERSION in sw.js hochzählen.
-const APP_VERSION = '1.15.0';
+const APP_VERSION = '1.16.0';
 const KEY = 'kalorien.v1';
 const DEFAULTS = () => ({
-  v: 1, setup: false, name: '', greeted: false, goals: { kcal: 2500, c: 280, p: 150, f: 80 }, weightKg: 80, days: {}, foods: {}, weights: [], lastBackup: null,
+  v: 1, setup: false, name: '', greeted: false, goals: { kcal: 2500, c: 280, p: 150, f: 80 }, weightKg: 80, days: {}, foods: {}, weights: [], lastBackup: null, bkRemind: 7, bkSnooze: 0,
   supps: [{ id: 'kreatin', name: 'Kreatin', dose: '5 g' }, { id: 'shake', name: 'Protein-Shake', dose: '' }, { id: 'vitamine', name: 'Vitamine', dose: '' }],
   suppLog: {}, body: [], photos: [], badges: null, profile: null,
 });
@@ -164,6 +164,7 @@ function viewToday() {
   <h1 class="lt" data-act="calendar"><small>${longDate(cur)}${kdate(cur).getFullYear() !== new Date().getFullYear() ? ' ' + kdate(cur).getFullYear() : ''}</small>${dayTitle(cur)}</h1>
   ${isToday && S.name ? `<p class="greet">${greeting()}</p>` : ''}
   ${isToday ? streakPill() : ''}
+  ${isToday && backupDue() ? backupBanner() : ''}
   <section class="card hero">
     <div class="ringwrap">${ring(over ? 1 : (avail ? t.kcal / avail : 0), over ? 'var(--org)' : 'var(--tint)', { size: 140, stroke: 18 })}
       <div class="ringlabel"><b class="num">${n0(Math.abs(left))}</b><span>${over ? 'kcal zu viel' : 'kcal übrig'}</span></div></div>
@@ -244,9 +245,9 @@ function viewHistory() {
   const lastW = S.weights.length ? S.weights[S.weights.length - 1] : null;
   const wDiff = weightDiff(30);
   const pAvg = avg('p');
-  const backupAge = S.lastBackup ? Math.floor((Date.now() - S.lastBackup) / 864e5) : null;
+  const backupAge = bkAge();
   const hasAny = Object.keys(S.days).length > 0;
-  const backupSub = S.lastBackup ? `Zuletzt gesichert am ${shortDate(dkey(new Date(S.lastBackup)))}` : 'Noch nie gesichert';
+  const backupSub = backupAge !== null ? `Zuletzt gesichert ${agoText(backupAge)}` : 'Noch nie gesichert';
   const canBack = r !== 'all' && P.from > firstDataKey(), canFwd = r !== 'all' && histOff > 0;
   return `
   <header class="nav"><span></span><button class="circle" data-act="calendar" aria-label="Kalender">${icon('calendar')}</button></header>
@@ -380,7 +381,7 @@ function viewGoals() {
   <section class="list icons"><button class="it" data-act="supps">${tile('pill', ['#c77dff', '#9b4dde'])}<div class="n"><b>Supplements</b><span>${S.supps.length ? esc(S.supps.map(s => s.name).join(', ')) : 'Ausgeblendet, tippen zum Einrichten'}</span></div><span class="chev">${icon('right')}</span></button></section>
   <div class="hdr"><span>Daten</span></div>
   <section class="list icons">
-    <button class="it" data-act="backup">${tile('cloud', ['#40a0ff', '#0a6fe0'])}<div class="n"><b>Backup erstellen oder laden</b><span>Sicherungsdatei, z. B. in iCloud Drive</span></div><span class="chev">${icon('right')}</span></button>
+    <button class="it" data-act="backup">${tile('cloud', ['#40a0ff', '#0a6fe0'])}<div class="n"><b>Backup</b><span>${bkAge() !== null ? `Zuletzt gesichert ${agoText(bkAge())}` : 'Noch nie gesichert'}</span></div><span class="chev">${icon('right')}</span></button>
     <button class="it" data-act="healthHelp">${tile('heart', ['#ff5c7c', '#e8264d'])}<div class="n"><b>Apple Health verbinden</b><span>Verbrannte Kalorien per Kurzbefehl</span></div><span class="chev">${icon('right')}</span></button>
     <button class="it" data-act="ownFoods">${tile('pencil', ['#a1a1a6', '#6e6e73'])}<div class="n"><b>Eigene Lebensmittel</b><span>${Object.values(S.foods).length} gespeichert</span></div><span class="chev">${icon('right')}</span></button>
   </section>
@@ -1170,26 +1171,83 @@ function openWish() {
 }
 
 /* ---------- Backup ---------- */
+// Erinnerung: alle wie viele Tage an ein Backup erinnert wird (0 = nie)
+const BK_REMIND = [[7, 'Jede Woche'], [30, 'Jeden Monat'], [0, 'Nie']];
+const BK_SAFETY = '__vorher';
+const bkAge = () => S.lastBackup ? Math.floor((Date.now() - S.lastBackup) / 864e5) : null;
+const agoText = d => d === 0 ? 'heute' : d === 1 ? 'gestern' : `vor ${d} Tagen`;
+function backupDue() {
+  if (!S.bkRemind || Object.keys(S.days).length < 3 || Date.now() < (S.bkSnooze || 0)) return false;
+  return !S.lastBackup || Date.now() - S.lastBackup > S.bkRemind * 864e5;
+}
+function backupBanner() {
+  const a = bkAge();
+  return `<section class="bkbanner">${tile('cloud', ['#ffb340', '#ff8a00'])}<div class="n"><b>Zeit für ein Backup</b><span>${a === null ? 'Sichere deine Daten einmal als Datei' : `Letztes Backup ${agoText(a)}`}</span></div><button class="pillbtn" data-act="backup">Sichern</button><button class="xb" data-act="bkLater" aria-label="Später erinnern">${icon('x')}</button></section>`;
+}
+// Was im Backup steckt, als Zeilen für die Übersicht
+function bkRows(d, nPhotos) {
+  const sum = Object.values(d.days || {}).reduce((a, x) => a + (x.food || []).length, 0);
+  return [
+    ['calendar', ['#ff5c7c', '#e8264d'], 'Tage mit Einträgen', Object.keys(d.days || {}).length, `${sum} Lebensmittel eingetragen`],
+    ['pencil', ['#a1a1a6', '#6e6e73'], 'Eigene Lebensmittel', Object.keys(d.foods || {}).length],
+    ['scales', ['#40a0ff', '#0a6fe0'], 'Gewicht', (d.weights || []).length],
+    ['ruler', ['#5ac8fa', '#1a9bd7'], 'Körpermaße', (d.body || []).length],
+    ['camera', ['#4ee37a', '#24b34b'], 'Fortschrittsfotos', nPhotos],
+    ['pill', ['#c77dff', '#9b4dde'], 'Supplements', (d.supps || []).length],
+    ['target', ['#ffb340', '#ff8a00'], 'Ziele, Profil & Abzeichen', '✓'],
+  ].map(([ic, g, n, v, sub]) => `<div class="it">${tile(ic, g)}<div class="n"><b>${n}</b>${sub ? `<span>${sub}</span>` : ''}</div><span class="k num">${v}</span></div>`).join('');
+}
+const fmtSize = b => b > 1048576 ? `${(b / 1048576).toFixed(1).replace('.', ',')} MB` : `${Math.max(1, Math.round(b / 1024))} KB`;
 let bkPhotos = null;
-function openBackup() {
-  // Fotos schon beim Öffnen laden, damit „Teilen“ direkt nach dem Tippen startet (iOS verlangt das)
+function preloadPhotos() {
+  // Fotos vorab laden, damit „Teilen“ direkt nach dem Tippen startet (iOS verlangt das)
   bkPhotos = S.photos.length ? loadAllPhotos() : Promise.resolve({});
   bkPhotos.then(p => { bkPhotos.done = p; }).catch(() => { bkPhotos.done = {}; });
+  return bkPhotos;
+}
+const bkPayload = photos => JSON.stringify({ app: 'biss', version: APP_VERSION, exported: new Date().toISOString(), data: S, photos });
+function openBackup() {
+  preloadPhotos();
+  const a = bkAge(), fresh = a !== null && a < 7;
   openLayer('sheet', `
-    <div class="sh"><div class="t"><b>Backup</b><span>${S.lastBackup ? `Zuletzt gesichert am ${shortDate(dkey(new Date(S.lastBackup)))}` : 'Noch nie gesichert'}</span></div><button class="xb" data-act="close" aria-label="Schließen">${icon('x')}</button></div>
-    <p class="note" style="text-align:left">Deine Daten liegen nur auf diesem iPhone. Sichere sie ab und zu als Datei, z. B. in <b>iCloud Drive</b>. Wenn du die App löschst oder ein neues Handy hast, kannst du sie damit wiederherstellen.${S.photos.length ? ` Deine ${S.photos.length} Fortschrittsfotos sind mit drin.` : ''}</p>
-    <button class="btn" id="bkSave">Backup erstellen</button>
-    <button class="btn sec" id="bkLoad">Backup wiederherstellen</button>
+    <div class="sh"><div class="t"><b>Backup</b><span>Deine Daten als Datei sichern</span></div><button class="xb" data-act="close" aria-label="Schließen">${icon('x')}</button></div>
+    <div class="bkstate ${a === null ? 'never' : fresh ? 'ok' : 'old'}">
+      <span class="bkico">${icon(fresh ? 'check' : 'cloud')}</span>
+      <div><b>${a === null ? 'Noch nie gesichert' : `Gesichert ${agoText(a)}`}</b><span>${a === null ? 'Ohne Backup sind deine Daten weg, wenn du die App löschst oder das Handy wechselst.' : `Am ${shortDate(dkey(new Date(S.lastBackup)))} um ${new Date(S.lastBackup).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr`}</span></div>
+    </div>
+    <button class="btn" id="bkSave">${icon('share')} Backup jetzt sichern</button>
+    <p class="foot bkhow">Im Teilen-Menü auf <b>„In Dateien sichern“</b> tippen und <b>iCloud Drive</b> wählen. Dann ist das Backup auch auf einem neuen Handy da.</p>
+    <div class="hdr"><span>Das ist im Backup</span><span id="bkSize"></span></div>
+    <section class="list icons bklist">${bkRows(S, S.photos.length)}</section>
+    <div class="hdr"><span>An Backup erinnern</span></div>
+    <div class="seg" id="bkRem">${BK_REMIND.map(([d, l]) => `<button data-d="${d}" class="${(S.bkRemind || 0) === d ? 'on' : ''}">${l}</button>`).join('')}</div>
+    <div class="hdr"><span>Wiederherstellen</span></div>
+    <section class="list icons bklist">
+      <button class="it" id="bkLoad">${tile('download', ['#40a0ff', '#0a6fe0'])}<div class="n"><b>Backup laden</b><span>Datei aus iCloud Drive oder Dateien wählen</span></div><span class="chev">${icon('right')}</span></button>
+      <button class="it" id="bkUndo" hidden>${tile('left', ['#a1a1a6', '#6e6e73'])}<div class="n"><b>Rückgängig machen</b><span id="bkUndoSub"></span></div><span class="chev">${icon('right')}</span></button>
+    </section>
     <input type="file" id="bkFile" accept="application/json,.json" hidden>`, el => {
     $('#bkSave', el).addEventListener('click', exportBackup);
     $('#bkLoad', el).addEventListener('click', () => $('#bkFile', el).click());
     $('#bkFile', el).addEventListener('change', ev => { const file = ev.target.files[0]; if (file) importBackup(file); ev.target.value = ''; });
+    $('#bkRem', el).addEventListener('click', ev => {
+      const b = ev.target.closest('button'); if (!b) return;
+      S.bkRemind = +b.dataset.d; S.bkSnooze = 0; save(); render();
+      el.querySelectorAll('#bkRem button').forEach(x => x.classList.toggle('on', x === b));
+    });
+    bkPhotos.then(p => { const s = $('#bkSize', el); if (s) s.textContent = 'ca. ' + fmtSize(bkPayload(p).length); }).catch(() => {});
+    PDB.get(BK_SAFETY).then(v => {
+      if (!v || !v.data) return;
+      $('#bkUndoSub', el).textContent = `Stand vor dem Laden (${shortDate(dkey(new Date(v.at)))}) zurückholen`;
+      $('#bkUndo', el).hidden = false;
+      $('#bkUndo', el).addEventListener('click', () => confirmRestore(v.data, v.photos || {}, { undo: true }));
+    }).catch(() => {});
   });
 }
 async function exportBackup() {
   const name = `biss-backup-${todayKey()}.json`;
   const photos = bkPhotos && bkPhotos.done ? bkPhotos.done : await (bkPhotos || loadAllPhotos()).catch(() => ({}));
-  const blob = new Blob([JSON.stringify({ app: 'kalorien', version: APP_VERSION, exported: new Date().toISOString(), data: S, photos })], { type: 'application/json' });
+  const blob = new Blob([bkPayload(photos)], { type: 'application/json' });
   const file = new File([blob], name, { type: 'application/json' });
   try {
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
@@ -1198,7 +1256,8 @@ async function exportBackup() {
       const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click();
       setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
     }
-    S.lastBackup = Date.now(); save(); render(); toast('Backup erstellt');
+    S.lastBackup = Date.now(); S.bkSnooze = 0; save(); render(); toast('Backup gesichert');
+    const st = $('.bkstate'); if (st) { st.className = 'bkstate ok'; st.innerHTML = `<span class="bkico">${icon('check')}</span><div><b>Gesichert heute</b><span>Gut gemacht. Deine Daten sind jetzt als Datei gesichert.</span></div>`; }
   } catch (e) {
     if (e && e.name === 'AbortError') return;
     toast('Backup konnte nicht erstellt werden');
@@ -1207,25 +1266,61 @@ async function exportBackup() {
 function importBackup(file) {
   const r = new FileReader();
   r.onload = () => {
-    let data, photos = {};
-    try { const o = JSON.parse(r.result); data = o.data || o; photos = o.photos && typeof o.photos === 'object' ? o.photos : {}; } catch (e) { toast('Die Datei ist kein gültiges Backup'); return; }
+    let data, photos = {}, exported = null;
+    try { const o = JSON.parse(r.result); data = o.data || o; exported = o.exported || null; photos = o.photos && typeof o.photos === 'object' ? o.photos : {}; } catch (e) { toast('Die Datei ist kein gültiges Backup'); return; }
     if (!data || typeof data !== 'object' || !data.days || !data.goals) { toast('Die Datei ist kein gültiges Backup'); return; }
-    const days = Object.keys(data.days).length;
-    openLayer('sheet', `
-      <div class="sh"><div class="t"><b>Backup wiederherstellen?</b><span>${days} Tage, ${Object.keys(data.foods || {}).length} Lebensmittel${Object.keys(photos).length ? `, ${Object.keys(photos).length} Fotos` : ''}</span></div><button class="xb" data-act="close" aria-label="Schließen">${icon('x')}</button></div>
-      <p class="note">Die Daten auf diesem iPhone werden durch das Backup ersetzt.</p>
-      <button class="btn" id="imOk">Ersetzen</button><button class="btn sec" data-act="close">Abbrechen</button>`, el => {
-      $('#imOk', el).addEventListener('click', () => {
-        S = normalize({ ...data, setup: true });
-        S.photos = S.photos.filter(p => photos[p.id] && photos[p.id].full);
-        if (!S.badges) initBadges();
-        save(); closeAll(); render(); toast('Backup wiederhergestellt');
-        thumbCache.clear();
-        PDB.clear().then(() => Promise.all(S.photos.map(p => Promise.all([PDB.put(p.id, photos[p.id].full), PDB.put(p.id + ':t', photos[p.id].thumb || photos[p.id].full)])))).catch(() => toast('Fotos konnten nicht wiederhergestellt werden'));
-      });
-    });
+    confirmRestore(data, photos, { exported });
   };
   r.readAsText(file);
+}
+// Vorschau des Backups, dann ersetzen oder zusammenführen
+function confirmRestore(data, photos, { exported, undo } = {}) {
+  const nPh = (data.photos || []).filter(p => photos[p.id]).length;
+  const when = exported && !isNaN(new Date(exported)) ? `Erstellt am ${shortDate(dkey(new Date(exported)))}` : 'Backup-Datei';
+  openLayer('sheet', `
+    <div class="sh"><div class="t"><b>${undo ? 'Rückgängig machen?' : 'Backup laden?'}</b><span>${undo ? 'Stand vor der letzten Wiederherstellung' : when}${data.name ? ` · ${esc(data.name)}` : ''}</span></div><button class="xb" data-act="close" aria-label="Schließen">${icon('x')}</button></div>
+    <section class="list icons bklist">${bkRows(data, nPh)}</section>
+    ${undo ? '' : `<button class="btn" id="imMerge">Zusammenführen</button>
+    <p class="foot">Behält alles auf diesem iPhone und ergänzt, was nur im Backup ist. Gut, wenn du auf zwei Handys eingetragen hast.</p>`}
+    <button class="btn ${undo ? '' : 'sec'}" id="imOk">${undo ? 'Zurückholen' : 'Alles ersetzen'}</button>
+    <p class="foot">${undo ? 'Der jetzige Stand wird durch den alten ersetzt.' : 'Ersetzt die Daten auf diesem iPhone komplett durch das Backup.'} Den jetzigen Stand kannst du danach unter Backup wieder zurückholen.</p>
+    <button class="btn del" data-act="close">Abbrechen</button>`, el => {
+    $('#imOk', el).addEventListener('click', () => applyRestore(normalize({ ...data, setup: true }), photos, undo ? 'Alter Stand zurückgeholt' : 'Backup wiederhergestellt'));
+    const m = $('#imMerge', el);
+    if (m) m.addEventListener('click', () => mergeRestore(data, photos));
+  });
+}
+async function applyRestore(next, photos, msg) {
+  const cur = await loadAllPhotos().catch(() => ({}));
+  next.photos = next.photos.filter(p => photos[p.id] && photos[p.id].full);
+  // Jetzigen Stand sichern, damit man die Wiederherstellung rückgängig machen kann
+  const safety = { at: Date.now(), data: JSON.parse(JSON.stringify(S)), photos: cur };
+  const keep = { lastBackup: S.lastBackup, bkRemind: S.bkRemind };
+  S = { ...next, ...keep };
+  if (!S.badges) initBadges();
+  save(); closeAll(); render(); toast(msg);
+  thumbCache.clear();
+  try {
+    await PDB.clear();
+    await Promise.all(S.photos.map(p => Promise.all([PDB.put(p.id, photos[p.id].full), PDB.put(p.id + ':t', photos[p.id].thumb || photos[p.id].full)])));
+    await PDB.put(BK_SAFETY, safety);
+  } catch (e) { toast('Fotos konnten nicht wiederhergestellt werden'); }
+  render();
+}
+function mergeRestore(data, photos) {
+  const b = normalize(data), m = JSON.parse(JSON.stringify(S));
+  const union = (a, x, key) => { const seen = new Set(a.map(e => e[key])); return [...a, ...x.filter(e => !seen.has(e[key]))]; };
+  for (const [k, d] of Object.entries(b.days)) {
+    const c = m.days[k] || { food: [], sport: [] };
+    m.days[k] = { ...d, ...c, food: union(c.food || [], d.food || [], 'id'), sport: union(c.sport || [], d.sport || [], 'id') };
+  }
+  m.foods = { ...b.foods, ...m.foods };
+  m.weights = union(m.weights, b.weights, 'date').sort((x, y) => x.date.localeCompare(y.date));
+  m.body = union(m.body, b.body, 'date').sort((x, y) => x.date.localeCompare(y.date));
+  m.supps = union(m.supps, b.supps, 'id');
+  for (const [k, ids] of Object.entries(b.suppLog)) m.suppLog[k] = [...new Set([...(m.suppLog[k] || []), ...ids])];
+  m.photos = union(m.photos, b.photos.filter(p => photos[p.id] && photos[p.id].full), 'id').sort((x, y) => x.date.localeCompare(y.date) || x.t - y.t);
+  loadAllPhotos().catch(() => ({})).then(cur => applyRestore(normalize(m), { ...photos, ...cur }, 'Backup zusammengeführt'));
 }
 
 /* ---------- Ziel-Rechner ---------- */
@@ -1438,6 +1533,7 @@ const ACT = {
     if (daySupps(cur) && !l.includes(id)) toast('Alle Supplements erledigt ✅');
   },
   backup: () => openBackup(),
+  bkLater: () => { S.bkSnooze = Date.now() + 3 * 864e5; save(); render(); toast('Ich erinnere dich in 3 Tagen'); },
   healthHelp: () => openHealthHelp(),
   shareApp: () => openShare(),
   shareLink: () => shareLink(),
