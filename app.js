@@ -29,7 +29,7 @@ const DONATE_URL = 'https://paypal.me/MortenUkena';
 // Verbesserungswünsche gehen über Formspree direkt an den Entwickler. Leer lassen, um den Eintrag auszublenden.
 const WISH_URL = 'https://formspree.io/f/xeepbyjn';
 // Versionsnummer für die Anzeige in der App. Bei jedem Update zusammen mit VERSION in sw.js hochzählen.
-const APP_VERSION = '1.14.1';
+const APP_VERSION = '1.15.0';
 const KEY = 'kalorien.v1';
 const DEFAULTS = () => ({
   v: 1, setup: false, name: '', greeted: false, goals: { kcal: 2500, c: 280, p: 150, f: 80 }, weightKg: 80, days: {}, foods: {}, weights: [], lastBackup: null,
@@ -393,7 +393,7 @@ function viewGoals() {
   <p class="foot">Alle Daten bleiben auf diesem Gerät. Es gibt kein Konto und keine Werbung. Eingebaute Lebensmittel sind Richtwerte. Die Online-Suche und der Barcode-Scan nutzen Open Food Facts (offene Datenbank, ODbL).</p>
   <section class="list"><button class="it danger" data-act="wipe">Alle Daten löschen</button></section>
   ${(lockState() || {}).gesperrt && lockBypassed() ? `<div class="hdr"><span>Sperre</span></div>
-  <section class="list icons"><button class="it" data-act="lockPreview">${tile('warn', ['#ff6b8a', '#e3123f'])}<div class="n"><b>Auf diesem Handy sperren</b><span>Wieder rein: 7× auf „Biss · Wartung“ tippen</span></div><span class="chev">${icon('right')}</span></button></section>` : ''}
+  <section class="list icons"><button class="it" data-act="lockPreview">${tile('warn', ['#ff6b8a', '#e3123f'])}<div class="n"><b>Auf diesem Handy sperren</b><span>Wieder rein: „Ich bin Admin“ und Passwort</span></div><span class="chev">${icon('right')}</span></button></section>` : ''}
   <p class="ver">Biss · Version ${APP_VERSION}</p>`;
 }
 
@@ -1539,6 +1539,7 @@ function showLock(st) {
       <div class="mx-bar mx-in" style="animation-delay:.75s"><i></i></div>
       <div class="mx-step mx-in" style="animation-delay:.85s"><span id="lockStep">${esc(STEPS[0])}</span></div>
       <p class="mx-foot mx-in" style="animation-delay:1.15s">Deine Daten bleiben sicher auf deinem iPhone.</p>
+      <button class="mx-admin mx-in" id="lockAdmin" style="animation-delay:1.3s"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>Ich bin Admin</button>
     </div>`;
   // Statuszeile wechselt sanft
   clearInterval(lockTick);
@@ -1551,7 +1552,42 @@ function showLock(st) {
   let taps = 0, tT;
   $('#lockBadge', el).addEventListener('click', () => {
     clearTimeout(tT); tT = setTimeout(() => { taps = 0; }, 2000);
-    if (++taps >= 7) { try { localStorage.removeItem(RELOCK_KEY); } catch (e) { /* egal */ } lsSet(OWNER_KEY, '1'); hideLock(el); toast('Sperre auf diesem Gerät aufgehoben'); render(); }
+    if (++taps >= 7) unlockOwner(el, 'Sperre auf diesem Gerät aufgehoben');
+  });
+  $('#lockAdmin', el).addEventListener('click', () => showAdminLogin(el, st));
+}
+function unlockOwner(el, msg) {
+  try { localStorage.removeItem(RELOCK_KEY); } catch (e) { /* egal */ }
+  lsSet(OWNER_KEY, '1'); hideLock(el); toast(msg); render();
+}
+// Admin-Login: Passwort wird nur als SHA-256-Prüfsumme verglichen (kein echter Schutz, die App läuft komplett im Browser)
+const ADMIN_HASH = '73887ad2ebd766a3876b21123636213a62ffd820ab061a7b5a5c6180c693305b';
+async function sha256(t) { const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(t)); return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, '0')).join(''); }
+let admFails = 0, admWait = 0;
+function showAdminLogin(el, st) {
+  const box = $('.mx', el);
+  box.innerHTML = `
+    <button class="mx-back mx-in" id="admBack"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Zurück</button>
+    <div class="mx-adico mx-in" style="animation-delay:.1s"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l7.5 3v5.6c0 4.6-3.1 8.4-7.5 9.8-4.4-1.4-7.5-5.2-7.5-9.8V5.8z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M8.6 12.2l2.3 2.3 4.6-4.8" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    <h2 class="mx-in" style="animation-delay:.2s">Admin-Login</h2>
+    <p class="mx-sub mx-in" style="animation-delay:.3s">Nur für den Entwickler von Biss. Danach ist die App auf diesem Gerät frei.</p>
+    <form class="mx-login mx-in" id="admForm" style="animation-delay:.4s" autocomplete="on">
+      <input type="text" name="username" value="admin" autocomplete="username" hidden>
+      <input type="password" id="admPw" placeholder="Passwort" autocomplete="current-password" enterkeyhint="go" aria-label="Passwort">
+      <button type="submit">Anmelden</button>
+    </form>
+    <p class="mx-err" id="admErr" role="alert"></p>`;
+  const pw = $('#admPw', box), err = $('#admErr', box), form = $('#admForm', box);
+  setTimeout(() => pw.focus(), 350);
+  $('#admBack', box).addEventListener('click', () => { lockSig = null; showLock(st); });
+  form.addEventListener('submit', async ev => {
+    ev.preventDefault();
+    if (Date.now() < admWait) { err.textContent = `Zu viele Versuche. Warte ${Math.ceil((admWait - Date.now()) / 1000)} Sekunden.`; return; }
+    if (await sha256(pw.value.trim()) === ADMIN_HASH) { admFails = 0; pw.blur(); unlockOwner(el, 'Willkommen zurück, Admin'); return; }
+    if (++admFails >= 5) { admWait = Date.now() + 30000; admFails = 0; }
+    err.textContent = 'Falsches Passwort';
+    form.classList.remove('shake'); void form.offsetWidth; form.classList.add('shake');
+    pw.select();
   });
 }
 async function checkLock() {

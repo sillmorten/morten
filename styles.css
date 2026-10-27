@@ -355,3 +355,22 @@ i.o { background: var(--org); }
 @keyframes mxBar { 0% { left: -40%; } 100% { left: 100%; } }
 @keyframes mxNo { 20%, 60% { transform: translateX(-10px); } 40%, 80% { transform: translateX(10px); } }
 @media (prefers-reduced-motion: reduce) { #lock, #lock *, #lock *::after { animation: none !important; } #lock h2 { color: #fff; } }
+
+/* Admin-Login auf der Wartungs-Seite */
+.mx-admin { display: inline-flex; align-items: center; gap: 7px; margin-top: 22px; padding: 9px 16px; border-radius: 99px; font-size: 13px; font-weight: 600; color: rgba(255,255,255,.6);
+  background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); -webkit-tap-highlight-color: transparent; transition: transform .15s, color .2s; }
+.mx-admin:active { transform: scale(.96); color: #fff; }
+.mx-admin svg { width: 15px; height: 15px; }
+.mx-back { position: fixed; top: calc(env(safe-area-inset-top, 0px) + 14px); left: 16px; display: inline-flex; align-items: center; gap: 4px; padding: 8px 12px 8px 8px; border-radius: 99px; font-size: 15px; font-weight: 600; color: rgba(255,255,255,.8); background: rgba(255,255,255,.07); -webkit-tap-highlight-color: transparent; }
+.mx-back svg { width: 18px; height: 18px; }
+.mx-adico { width: 92px; height: 92px; border-radius: 28px; display: flex; align-items: center; justify-content: center; margin-bottom: 26px; color: #fff;
+  background: linear-gradient(145deg, rgba(255,55,95,.95), rgba(255,122,69,.95)); box-shadow: 0 18px 50px rgba(255,55,95,.4), inset 0 1px 0 rgba(255,255,255,.3); }
+.mx-adico svg { width: 46px; height: 46px; }
+.mx-login { display: flex; gap: 8px; width: 100%; margin-top: 30px; padding: 6px; border-radius: 18px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); }
+.mx-login input { flex: 1; min-width: 0; background: transparent; border: 0; outline: 0; color: #fff; font-size: 17px; padding: 0 12px; }
+.mx-login input::placeholder { color: rgba(255,255,255,.35); }
+.mx-login button { padding: 13px 18px; border-radius: 13px; font-size: 16px; font-weight: 600; color: #fff; background: linear-gradient(135deg, #ff375f, #ff7a45); }
+.mx-login button:active { opacity: .85; }
+.mx-login.shake { animation: mxShake .45s; }
+.mx-err { min-height: 18px; margin: 12px 0 0; font-size: 13px; font-weight: 500; color: #ff6b81; }
+@keyframes mxShake { 20%, 60% { transform: translateX(-8px); } 40%, 80% { transform: translateX(8px); } }
