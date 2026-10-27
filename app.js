@@ -29,7 +29,7 @@ const DONATE_URL = 'https://paypal.me/MortenUkena';
 // Verbesserungswünsche gehen über Formspree direkt an den Entwickler. Leer lassen, um den Eintrag auszublenden.
 const WISH_URL = 'https://formspree.io/f/xeepbyjn';
 // Versionsnummer für die Anzeige in der App. Bei jedem Update zusammen mit VERSION in sw.js hochzählen.
-const APP_VERSION = '1.16.0';
+const APP_VERSION = '1.16.1';
 const KEY = 'kalorien.v1';
 const DEFAULTS = () => ({
   v: 1, setup: false, name: '', greeted: false, goals: { kcal: 2500, c: 280, p: 150, f: 80 }, weightKg: 80, days: {}, foods: {}, weights: [], lastBackup: null, bkRemind: 7, bkSnooze: 0,
@@ -1174,6 +1174,7 @@ function openWish() {
 // Erinnerung: alle wie viele Tage an ein Backup erinnert wird (0 = nie)
 const BK_REMIND = [[7, 'Jede Woche'], [30, 'Jeden Monat'], [0, 'Nie']];
 const BK_SAFETY = '__vorher';
+const IS_ANDROID = /Android/i.test(navigator.userAgent);
 const bkAge = () => S.lastBackup ? Math.floor((Date.now() - S.lastBackup) / 864e5) : null;
 const agoText = d => d === 0 ? 'heute' : d === 1 ? 'gestern' : `vor ${d} Tagen`;
 function backupDue() {
@@ -1216,14 +1217,14 @@ function openBackup() {
       <div><b>${a === null ? 'Noch nie gesichert' : `Gesichert ${agoText(a)}`}</b><span>${a === null ? 'Ohne Backup sind deine Daten weg, wenn du die App löschst oder das Handy wechselst.' : `Am ${shortDate(dkey(new Date(S.lastBackup)))} um ${new Date(S.lastBackup).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr`}</span></div>
     </div>
     <button class="btn" id="bkSave">${icon('share')} Backup jetzt sichern</button>
-    <p class="foot bkhow">Im Teilen-Menü auf <b>„In Dateien sichern“</b> tippen und <b>iCloud Drive</b> wählen. Dann ist das Backup auch auf einem neuen Handy da.</p>
+    <p class="foot bkhow">${IS_ANDROID ? 'Die Datei landet in <b>„Downloads“</b>. Lade sie am besten zusätzlich in <b>Google Drive</b> hoch, dann ist das Backup auch auf einem neuen Handy da.' : 'Im Teilen-Menü auf <b>„In Dateien sichern“</b> tippen und <b>iCloud Drive</b> wählen. Dann ist das Backup auch auf einem neuen Handy da.'}</p>
     <div class="hdr"><span>Das ist im Backup</span><span id="bkSize"></span></div>
     <section class="list icons bklist">${bkRows(S, S.photos.length)}</section>
     <div class="hdr"><span>An Backup erinnern</span></div>
     <div class="seg" id="bkRem">${BK_REMIND.map(([d, l]) => `<button data-d="${d}" class="${(S.bkRemind || 0) === d ? 'on' : ''}">${l}</button>`).join('')}</div>
     <div class="hdr"><span>Wiederherstellen</span></div>
     <section class="list icons bklist">
-      <button class="it" id="bkLoad">${tile('download', ['#40a0ff', '#0a6fe0'])}<div class="n"><b>Backup laden</b><span>Datei aus iCloud Drive oder Dateien wählen</span></div><span class="chev">${icon('right')}</span></button>
+      <button class="it" id="bkLoad">${tile('download', ['#40a0ff', '#0a6fe0'])}<div class="n"><b>Backup laden</b><span>${IS_ANDROID ? 'Backup-Datei aus Downloads oder Google Drive wählen' : 'Datei aus iCloud Drive oder Dateien wählen'}</span></div><span class="chev">${icon('right')}</span></button>
       <button class="it" id="bkUndo" hidden>${tile('left', ['#a1a1a6', '#6e6e73'])}<div class="n"><b>Rückgängig machen</b><span id="bkUndoSub"></span></div><span class="chev">${icon('right')}</span></button>
     </section>
     <input type="file" id="bkFile" accept="application/json,.json" hidden>`, el => {
@@ -1249,14 +1250,17 @@ async function exportBackup() {
   const photos = bkPhotos && bkPhotos.done ? bkPhotos.done : await (bkPhotos || loadAllPhotos()).catch(() => ({}));
   const blob = new Blob([bkPayload(photos)], { type: 'application/json' });
   const file = new File([blob], name, { type: 'application/json' });
+  const download = () => {
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  };
   try {
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      await navigator.share({ files: [file], title: name });
-    } else {
-      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click();
-      setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
-    }
-    S.lastBackup = Date.now(); S.bkSnooze = 0; save(); render(); toast('Backup gesichert');
+    // Android kann JSON-Dateien oft nicht teilen: dort direkt in „Downloads“ speichern
+    if (!IS_ANDROID && navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file], title: name }); }
+      catch (e) { if (e && e.name === 'AbortError') throw e; download(); }
+    } else download();
+    S.lastBackup = Date.now(); S.bkSnooze = 0; save(); render(); toast(IS_ANDROID ? 'Backup in „Downloads“ gespeichert' : 'Backup gesichert');
     const st = $('.bkstate'); if (st) { st.className = 'bkstate ok'; st.innerHTML = `<span class="bkico">${icon('check')}</span><div><b>Gesichert heute</b><span>Gut gemacht. Deine Daten sind jetzt als Datei gesichert.</span></div>`; }
   } catch (e) {
     if (e && e.name === 'AbortError') return;
