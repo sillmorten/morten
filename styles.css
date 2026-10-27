@@ -391,3 +391,5 @@ i.o { background: var(--org); }
 .bkhow { margin-top: -6px; }
 .sheet .seg { background: var(--sheetcard); }
 .bklist, .bkstate, .sheet .seg { flex: none; }
+.it .n.news-n b, .it .n.news-n span { white-space: normal; }
+.it .n.news-n span { line-height: 1.35; margin-top: 2px; }
