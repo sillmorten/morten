@@ -1,6 +1,6 @@
 // Offline-Cache: App-Dateien kommen aus dem Cache und werden im Hintergrund aktualisiert.
-const VERSION = 'biss-v34';
-const ASSETS = ['./', 'index.html', 'styles.css', 'app.js', 'icons.js', 'foods.js', 'vendor/zxing.min.js', 'manifest.webmanifest', 'icons/icon-32.png', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/qr.png'];
+const VERSION = 'biss-v35';
+const ASSETS = ['./', 'index.html', 'styles.css', 'app.js', 'icons.js', 'foods.js', 'ideas.js', 'vendor/zxing.min.js', 'manifest.webmanifest', 'icons/icon-32.png', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/qr.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(VERSION).then(c => c.addAll(ASSETS.map(u => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting()));

@@ -29,7 +29,7 @@ const DONATE_URL = 'https://paypal.me/MortenUkena';
 // Verbesserungswünsche gehen über Formspree direkt an den Entwickler. Leer lassen, um den Eintrag auszublenden.
 const WISH_URL = 'https://formspree.io/f/xeepbyjn';
 // Versionsnummer für die Anzeige in der App. Bei jedem Update zusammen mit VERSION in sw.js hochzählen.
-const APP_VERSION = '1.17.0';
+const APP_VERSION = '1.18.0';
 const KEY = 'kalorien.v1';
 const DEFAULTS = () => ({
   v: 1, setup: false, name: '', greeted: false, goals: { kcal: 2500, c: 280, p: 150, f: 80 }, weightKg: 80, days: {}, foods: {}, weights: [], lastBackup: null, bkRemind: 7, bkSnooze: 0,
@@ -85,7 +85,7 @@ for (const [cat, rows] of Object.entries(typeof FOOD_LIST !== 'undefined' ? FOOD
     BASE[id] = { id, src: 'base', cat, name, brand: cat === "McDonald's" ? cat : '', kcal, c, p, f, portion: pg ? { g: pg, label: `${pl} (${n0(pg)} g)` } : null };
   }
 }
-const getFood = id => S.foods[id] || BASE[id];
+const getFood = id => S.foods[id] || BASE[id] || IDEAS.find(i => i.id === id);
 const POPULAR = ['Ei', 'Banane', 'Haferflocken', 'Skyr natur', 'Magerquark', 'Hähnchenbrust roh', 'Reis gekocht', 'Nudeln gekocht', 'Vollkornbrot', 'Apfel', 'Milch 1,5 %', 'Kartoffeln gekocht'].map(n => 'base:' + slug(n));
 
 const mealOf = id => MEALS.find(m => m.id === id) || MEALS[3];
@@ -177,6 +177,7 @@ function viewToday() {
   <section class="mac">
     ${macro(t.c, g.c, 'var(--org)', 'Kohlenhydrate')}${macro(t.p, g.p, 'var(--grn)', 'Eiweiß')}${macro(t.f, g.f, 'var(--blu)', 'Fett')}
   </section>
+  ${IDEAS.length ? `<section class="list icons"><button class="it" data-act="ideas">${tile('bowl', ['#5ac8fa', '#1a8fd6'])}<div class="n"><b>Essensideen 💡</b><span>${ideasSub()}</span></div><span class="chev">${icon('right')}</span></button></section>` : ''}
   <div class="hdr"><span>Mahlzeiten</span></div>
   <section class="list icons">
     ${meals}
@@ -495,6 +496,7 @@ function renderAddBody() {
     } else html += list.length ? `<section class="list">${list.map(f => foodRow(f)).join('')}</section>` : `<p class="empty">${empty}</p>`;
   }
   html += `<section class="list icons">
+    ${IDEAS.length ? `<button class="it" data-act="ideas">${tile('bowl', ['#5ac8fa', '#1a8fd6'])}<div class="n"><b>Essensideen 💡</b><span>Gerichte zum Abnehmen oder Zunehmen</span></div><span class="chev">${icon('right')}</span></button>` : ''}
     <button class="it" data-act="newFood">${tile('pencil', ['#a1a1a6', '#6e6e73'])}<div class="n"><b>Eigenes Lebensmittel anlegen</b><span>Werte von der Packung abtippen</span></div><span class="chev">${icon('right')}</span></button>
     <button class="it" data-act="quick">${tile('bolt', ['#ffb340', '#ff8a00'])}<div class="n"><b>Schnell eintragen</b><span>Nur Kalorien, z. B. beim Essen auswärts</span></div><span class="chev">${icon('right')}</span></button>
   </section>`;
@@ -563,7 +565,8 @@ function openAmount(food, { entry = null, day = null, meal = null } = {}) {
   const startG = entry ? entry.g : (f.lastG || (f.portion ? f.portion.g : 100));
   const opts = [];
   opts.push({ g: 100, l: '100 g' });
-  if (f.portion) opts.push({ g: f.portion.g, l: f.portion.label.length > 22 ? `Portion ${n0(f.portion.g)} g` : f.portion.label });
+  if (f.src === 'idea' && f.portion) opts.push({ g: Math.round(f.portion.g / 2), l: '½ Gericht' }, { g: f.portion.g, l: 'Ganzes Gericht' }, { g: Math.round(f.portion.g * 1.5), l: '1½ Gerichte' });
+  else if (f.portion) opts.push({ g: f.portion.g, l: f.portion.label.length > 22 ? `Portion ${n0(f.portion.g)} g` : f.portion.label });
   if (f.pack && f.pack !== 100 && (!f.portion || f.pack !== f.portion.g)) opts.push({ g: f.pack, l: `Packung ${n0(f.pack)} g` });
   if (f.lastG && !opts.some(o => o.g === f.lastG)) opts.push({ g: f.lastG, l: `Zuletzt ${n0(f.lastG)} g` });
   openLayer('sheet', `
@@ -572,6 +575,7 @@ function openAmount(food, { entry = null, day = null, meal = null } = {}) {
     <div class="amt"><input id="grams" inputmode="decimal" value="${n1(startG)}" aria-label="Menge in Gramm"><span>g</span></div>
     <div class="pills">${opts.map(o => `<button class="pill" data-g="${o.g}">${esc(o.l)}</button>`).join('')}</div>
     <div class="nut" id="nut"></div>
+    ${f.ingr ? `<p class="note" style="margin:0">${esc(f.ingr)}</p>` : ''}
     <button class="btn" id="amtOk">${entry ? 'Speichern' : `Zu ${esc(mealOf(meal || addCtx?.meal || mealByTime()).name)} hinzufügen`}</button>
     ${entry ? `<button class="btn del" id="amtDel">Eintrag löschen</button>` : ''}`, el => {
     const gi = $('#grams', el);
@@ -596,7 +600,7 @@ function openAmount(food, { entry = null, day = null, meal = null } = {}) {
       }
       save(); buzz(); closeTop();
       toast(entry ? 'Gespeichert' : `${n0(v.kcal)} kcal eingetragen`);
-      render(); renderAddBody(); refreshMealSheet();
+      render(); renderAddBody(); refreshMealSheet(); refreshIdeas();
     });
     if (entry) $('#amtDel', el).addEventListener('click', () => deleteEntry(entry, day));
     upd();
@@ -694,6 +698,52 @@ function refreshOwnFoods() {
   b.innerHTML = `<div class="sh"><div class="t"><b>Gespeicherte Lebensmittel</b><span>Tippen zum Bearbeiten</span></div><button class="xb" data-act="close" aria-label="Schließen">${icon('x')}</button></div>
     ${list.length ? `<section class="list">${list.map(f => `<button class="it" data-act="editFood" data-id="${esc(f.id)}"><div class="n"><b>${f.fav ? '★ ' : ''}${esc(f.name)}</b><span>${f.brand ? esc(f.brand) + ' · ' : ''}${n0(f.kcal)} kcal pro 100 g</span></div><span class="chev">${icon('right')}</span></button>`).join('')}</section>` : '<p class="empty">Noch keine Lebensmittel gespeichert.</p>'}
     <button class="btn" data-act="newFood">Neues Lebensmittel</button>`;
+}
+
+/* ---------- Essensideen ---------- */
+// Jede Idee wird zu einem Lebensmittel mit Werten pro 100 g und dem ganzen Gericht als Portion, so geht Eintragen wie bei allem anderen
+const IDEAS = (typeof IDEA_LIST !== 'undefined' ? IDEA_LIST : []).map(([emoji, name, meals, goal, parts]) => {
+  const items = parts.map(([n, g]) => ({ f: BASE['base:' + slug(n)], g })).filter(x => x.f);
+  const g = items.reduce((a, x) => a + x.g, 0), t = { kcal: 0, c: 0, p: 0, f: 0 };
+  for (const x of items) { const v = calc(x.f, x.g); for (const k in t) t[k] += v[k]; }
+  const per = k => Math.round(t[k] / g * 1000) / 10;
+  return { id: 'idea:' + slug(name), src: 'idea', name, brand: '', emoji, meals, goal, total: t, kcal: per('kcal'), c: per('c'), p: per('p'), f: per('f'),
+    portion: { g, label: `Ganzes Gericht (${n0(g)} g)` }, ingr: items.map(x => `${x.f.name} ${n0(x.g)}\u00a0g`).join(' · ') };
+});
+const MEAL_SHARE = { b: .25, l: .35, d: .3, s: .12 };
+let ideaCtx = null;
+function ideaGoalDefault() {
+  if (S.ideaGoal) return S.ideaGoal;
+  const pr = S.profile, r = pr && calcGoals({ ...pr, weight: S.weights.length ? S.weights[S.weights.length - 1].kg : S.weightKg });
+  return r && r.mode === 'gain' ? 'gain' : 'lose';
+}
+function ideasSub() {
+  const t = totals(cur), left = S.goals.kcal - t.kcal + t.burned;
+  return left > 0 ? `Passend zu deinen ${n0(left)} kcal übrig` : 'Leichte Ideen, dein Ziel ist schon erreicht';
+}
+function openIdeas(meal) {
+  ideaCtx = { meal: meal || mealByTime(), day: cur };
+  openLayer('sheet', `<div id="ideaBody" style="display:flex;flex-direction:column;gap:14px"></div>`, () => { refreshIdeas(); return () => { ideaCtx = null; }; });
+}
+function refreshIdeas() {
+  const b = $('#ideaBody'); if (!b || !ideaCtx) return;
+  const goal = ideaGoalDefault(), meal = ideaCtx.meal, g = S.goals, t = totals(ideaCtx.day);
+  const left = g.kcal - t.kcal + t.burned, pLeft = g.p - t.p;
+  // Zielwert für diese Mahlzeit: ihr Anteil am Tag, beim Zunehmen eher mehr, nie mehr als noch übrig ist
+  const share = MEAL_SHARE[meal] * (g.kcal + t.burned);
+  const target = left <= 0 ? 100 : goal === 'gain' ? Math.min(left, Math.max(share, left * .5)) : Math.min(left, share);
+  const score = i => Math.abs(i.total.kcal - target) / Math.max(target, 150) - .5 * Math.min(i.total.p / Math.max(pLeft, 20), 1);
+  const list = IDEAS.filter(i => i.meals.includes(meal) && (i.goal === 'both' || i.goal === goal))
+    .map(i => ({ i, fits: i.total.kcal <= Math.max(left, 0) + 30, s: score(i) }))
+    .sort((a, c) => (c.fits - a.fits) || a.s - c.s);
+  const row = ({ i, fits }) => `<button class="it idea" data-act="pickIdea" data-id="${esc(i.id)}"><span class="emo">${i.emoji}</span><div class="n"><b>${esc(i.name)}</b><span>${esc(i.ingr)}</span>
+    <span class="im"><b class="num">${n0(i.total.kcal)} kcal</b> · ${n0(i.total.p)} g Eiweiß · ${n0(i.total.c)} g KH · ${n0(i.total.f)} g Fett</span>${left > 0 ? `<span class="fit ${fits ? 'ok' : 'no'}">${fits ? 'Passt noch rein' : `${n0(i.total.kcal - left)} kcal über deinem Ziel`}</span>` : ''}</div><span class="plus">${icon('plus')}</span></button>`;
+  b.innerHTML = `<div class="sh"><div class="t"><b>Essensideen</b><span>${left > 0 ? `Noch ${n0(left)} kcal${pLeft > 0 ? ` und ${n0(pLeft)} g Eiweiß` : ''} übrig` : 'Dein Kalorienziel ist für heute erreicht'}</span></div><button class="xb" data-act="close" aria-label="Schließen">${icon('x')}</button></div>
+    <div class="seg">${[['lose', 'Abnehmen'], ['gain', 'Zunehmen']].map(([id, l]) => `<button class="${goal === id ? 'on' : ''}" data-act="ideaGoal" data-g="${id}">${l}</button>`).join('')}</div>
+    <div class="seg">${MEALS.map(m => `<button class="${meal === m.id ? 'on' : ''}" data-act="ideaMeal" data-meal="${m.id}">${m.id === 's' ? 'Snack' : m.id === 'l' ? 'Mittag' : m.id === 'd' ? 'Abend' : m.name}</button>`).join('')}</div>
+    <p class="note" style="margin:0">${goal === 'gain' ? 'Viele Kalorien, gut zu schaffen und mit genug Eiweiß für die Muskeln.' : 'Macht satt, viel Eiweiß und wenig Kalorien.'} Antippen zum Eintragen, die Menge kannst du anpassen.</p>
+    <section class="list icons">${list.map(row).join('')}</section>
+    <p class="foot">Die Werte sind aus den eingebauten Lebensmitteln berechnet und damit Richtwerte.</p>`;
 }
 
 /* ---------- Barcode-Scanner ---------- */
@@ -1512,6 +1562,10 @@ const ACT = {
   editFood: b => { const f = S.foods[b.dataset.id]; if (f) openFoodForm({ food: f }); },
   ownFoods: () => openOwnFoods(),
   quick: () => openQuick(),
+  ideas: () => openIdeas(addCtx?.meal),
+  ideaGoal: b => { S.ideaGoal = b.dataset.g; save(); refreshIdeas(); },
+  ideaMeal: b => { ideaCtx.meal = b.dataset.meal; refreshIdeas(); },
+  pickIdea: b => { const f = getFood(b.dataset.id); if (f) openAmount(S.foods[f.id] ? { ...f, fav: S.foods[f.id].fav, lastG: S.foods[f.id].lastG } : f, { meal: ideaCtx.meal, day: ideaCtx.day }); },
   editEntry: b => {
     const e = getDay(mealSheet.day).food.find(x => x.id === b.dataset.id); if (!e) return;
     if (!e.foodId) { editQuick(e, mealSheet.day); return; }
@@ -1706,25 +1760,24 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 
 /* ---------- Update-Hinweis ---------- */
 // Wird jedem bestehenden Nutzer einmal gezeigt. Für die nächste Neuigkeit NEWS_ID ändern und Text anpassen.
-const NEWS_ID = 'backup-2026-10';
+const NEWS_ID = 'ideen-2026-10';
 function openNews() {
   S.seenNews = NEWS_ID; save();
-  const android = /Android/i.test(navigator.userAgent);
   const row = (ic, g, b, t) => `<div class="it">${tile(ic, g)}<div class="n news-n"><b>${b}</b><span>${t}</span></div></div>`;
   openLayer('sheet', `
     <div class="hello">
       <img src="icons/icon-192.png" alt="" class="hello-ic">
       <h2>Biss hat ein Update 🎉</h2>
-      <p>Ab jetzt kannst du deine Daten als Backup sichern und jederzeit wieder hochladen.</p>
+      <p>Neu: Essensideen zum Abnehmen oder Zunehmen, passend zu deinem Tag.</p>
     </div>
     <section class="list icons bklist">
-      ${row('cloud', ['#40a0ff', '#0a6fe0'], 'Backup erstellen', `Alles in einer Datei: Tage, Lebensmittel, Gewicht, Fotos und Ziele. ${android ? 'Landet in „Downloads“.' : 'Am besten in iCloud Drive sichern.'}`)}
-      ${row('download', ['#4ee37a', '#24b34b'], 'Backup wieder hochladen', 'Auf einem neuen Handy oder nach dem Löschen der App ist alles sofort wieder da.')}
-      ${row('calendar', ['#ffb340', '#ff8a00'], 'Erinnerung', 'Biss erinnert dich, wenn dein letztes Backup zu lange her ist.')}
+      ${row('bowl', ['#5ac8fa', '#1a8fd6'], 'Fast 40 Gerichte und Snacks', 'Vom Skyr-Bowl bis zum Masse-Shake, jeweils mit Kalorien und Eiweiß.')}
+      ${row('target', ['#ff5c7c', '#e8264d'], 'Passend zu deinem Ziel', 'Sortiert nach den Kalorien und dem Eiweiß, die dir heute noch fehlen.')}
+      ${row('plus', ['#4ee37a', '#24b34b'], 'Mit einem Tipp eingetragen', 'Ganzes, halbes oder anderthalb Gerichte, wie du magst.')}
     </section>
-    <button class="btn" id="nwGo">Jetzt Backup erstellen</button>
+    <button class="btn" id="nwGo">Essensideen ansehen</button>
     <button class="btn del" data-act="close" style="color:var(--l2)">Später</button>`, el => {
-    $('#nwGo', el).addEventListener('click', () => { closeTop(); setTimeout(openBackup, 330); });
+    $('#nwGo', el).addEventListener('click', () => { closeTop(); setTimeout(() => openIdeas(), 330); });
   });
   confetti();
 }

@@ -393,3 +393,14 @@ i.o { background: var(--org); }
 .bklist, .bkstate, .sheet .seg { flex: none; }
 .it .n.news-n b, .it .n.news-n span { white-space: normal; }
 .it .n.news-n span { line-height: 1.35; margin-top: 2px; }
+
+/* Essensideen */
+.it.idea { align-items: flex-start; }
+.it.idea .emo { width: 34px; height: 34px; flex: none; display: grid; place-items: center; font-size: 24px; line-height: 1; margin-top: 2px; }
+.it.idea .n .im { color: var(--l1); margin-top: 3px; }
+.it.idea .n b, .it.idea .n span { white-space: normal; }
+.it.idea .n .im b { display: inline; font-size: inherit; font-weight: 700; }
+.it.idea .n .fit { font-size: 12px; font-weight: 600; margin-top: 3px; }
+.it.idea .n .fit.ok { color: var(--grn); }
+.it.idea .n .fit.no { color: var(--org); }
+.it.idea .plus { margin-top: 6px; }
