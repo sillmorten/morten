@@ -28,8 +28,12 @@ const dayTitle = k => { const t = todayKey(); if (k === t) return 'Heute'; if (k
 const DONATE_URL = 'https://paypal.me/MortenUkena';
 // Verbesserungswünsche gehen über Formspree direkt an den Entwickler. Leer lassen, um den Eintrag auszublenden.
 const WISH_URL = 'https://formspree.io/f/xeepbyjn';
+// Anonyme Nutzungszählung für die Admin-App (admin/). Supabase-Projekt-URL und öffentlicher Schlüssel (publishable/anon).
+// Leer lassen, um die Zählung auszuschalten. Gesendet wird nur App, Art, Gerätetyp und Version, nie Namen oder Einträge.
+const STATS_URL = 'https://wfrtltqzhmeaildtlxga.supabase.co';
+const STATS_KEY = 'sb_publishable_Ic-sGCsYX6A3977v6kDEQA_i0W63MOG';
 // Versionsnummer für die Anzeige in der App. Bei jedem Update zusammen mit VERSION in sw.js hochzählen.
-const APP_VERSION = '1.19.0';
+const APP_VERSION = '1.19.3';
 const KEY = 'kalorien.v1';
 const DEFAULTS = () => ({
   v: 1, setup: false, name: '', greeted: false, goals: { kcal: 2500, c: 280, p: 150, f: 80 }, weightKg: 80, days: {}, foods: {}, weights: [], lastBackup: null, bkRemind: 7, bkSnooze: 0,
@@ -392,7 +396,7 @@ function viewGoals() {
   <section class="list icons"><button class="it" data-act="wish">${tile('sparkle', ['#ffd60a', '#f5a300'])}<div class="n"><b>Wunsch senden 💡</b><span>Was fehlt dir? Sag’s dem Entwickler</span></div><span class="chev">${icon('right')}</span></button></section>` : ''}
   ${DONATE_URL ? `<div class="hdr"><span>Unterstützen</span></div>
   <section class="list icons"><a class="it" href="${esc(DONATE_URL)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">${tile('paypal', ['#009cde', '#003087'])}<div class="n"><b>Entwickler unterstützen ☕</b><span>Freiwillige Spende per PayPal</span></div><span class="chev">${icon('right')}</span></a></section>` : ''}
-  <p class="foot">Alle Daten bleiben auf diesem Gerät. Es gibt kein Konto und keine Werbung. Eingebaute Lebensmittel sind Richtwerte. Die Online-Suche und der Barcode-Scan nutzen Open Food Facts (offene Datenbank, ODbL).</p>
+  <p class="foot">Alle Daten bleiben auf diesem Gerät. Es gibt kein Konto und keine Werbung. Eingebaute Lebensmittel sind Richtwerte. Die Online-Suche und der Barcode-Scan nutzen Open Food Facts (offene Datenbank, ODbL).${STATS_URL ? ' Biss zählt anonym, wie oft und wie lange die App geöffnet wird. Dabei werden kein Name, keine dauerhafte Kennung und keine Einträge gesendet.' : ''}</p>
   <section class="list"><button class="it danger" data-act="wipe">Alle Daten löschen</button></section>
   ${(lockState() || {}).gesperrt && lockBypassed() ? `<div class="hdr"><span>Sperre</span></div>
   <section class="list icons"><button class="it" data-act="lockPreview">${tile('warn', ['#ff6b8a', '#e3123f'])}<div class="n"><b>Auf diesem Handy sperren</b><span>Wieder rein: „Ich bin Admin“ und Passwort</span></div><span class="chev">${icon('right')}</span></button></section>` : ''}
@@ -1674,6 +1678,66 @@ document.addEventListener('visibilitychange', () => {
   const t = todayKey();
   if (t !== lastSeenDay) { if (cur === lastSeenDay) cur = t; lastSeenDay = t; render(); }
 });
+
+/* ---------- Nutzungszählung ---------- */
+// Pro Gerät höchstens eine Meldung am Tag („tag“) und einmalig „neu“ beim ersten Öffnen.
+// Der Merker liegt unter eigenem Namen und berührt die Nutzerdaten nicht.
+const STATS_MARK = KEY.replace(/\.v1$/, '') + '.zaehler';
+const statsDevice = () => /iPhone|iPad|iPod/.test(navigator.userAgent) ? 'iPhone' : /Android/.test(navigator.userAgent) ? 'Android' : 'Computer';
+let statsBusy = false;
+async function countDay() {
+  if (!STATS_URL || !STATS_KEY || statsBusy || location.protocol !== 'https:' || !navigator.onLine) return;
+  let mark = {};
+  try { mark = JSON.parse(localStorage.getItem(STATS_MARK)) || {}; } catch (e) {}
+  const t = todayKey();
+  if (mark.tag === t) return;
+  statsBusy = true;
+  const app = location.pathname.includes('bissone') ? 'beta' : 'live';
+  const rows = [{ app, art: 'tag', geraet: statsDevice(), version: APP_VERSION }];
+  if (!mark.neu) rows.push({ app, art: 'neu', geraet: statsDevice(), version: APP_VERSION });
+  try {
+    const r = await fetch(STATS_URL.replace(/\/$/, '') + '/rest/v1/nutzung', {
+      method: 'POST', keepalive: true,
+      headers: { apikey: STATS_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify(rows),
+    });
+    if (r.ok) { mark.tag = t; mark.neu = true; try { localStorage.setItem(STATS_MARK, JSON.stringify(mark)); } catch (e) {} }
+  } catch (e) {}
+  statsBusy = false;
+}
+countDay();
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') countDay(); });
+
+// Jedes Öffnen zählt als Aufruf: beim Start und wenn die App nach mindestens 10 Sekunden im Hintergrund wieder geöffnet wird
+let statsHidden = 0;
+function countOpen() {
+  if (!STATS_URL || !STATS_KEY || location.protocol !== 'https:' || !navigator.onLine) return;
+  fetch(STATS_URL.replace(/\/$/, '') + '/rest/v1/nutzung', {
+    method: 'POST', keepalive: true,
+    headers: { apikey: STATS_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+    body: JSON.stringify({ app: location.pathname.includes('bissone') ? 'beta' : 'live', art: 'auf', geraet: statsDevice(), version: APP_VERSION }),
+  }).catch(() => {});
+}
+countOpen();
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') statsHidden = Date.now();
+  else if (statsHidden && Date.now() - statsHidden >= 10 * 1000) countOpen();
+});
+
+// Live-Ansicht: Solange die App sichtbar ist, jede Minute ein kurzes „gerade offen“.
+// Die Sitzungsnummer ist zufällig, gilt nur bis zum Schließen und wird nirgends gespeichert.
+const STATS_SESSION = crypto.randomUUID ? crypto.randomUUID() : '10000000-1000-4000-8000-100000000000'.replace(/[018]/g, c => (c ^ Math.random() * 16 >> c / 4).toString(16));
+function pulse() {
+  if (!STATS_URL || !STATS_KEY || document.visibilityState !== 'visible' || location.protocol !== 'https:' || !navigator.onLine) return;
+  fetch(STATS_URL.replace(/\/$/, '') + '/rest/v1/puls', {
+    method: 'POST', keepalive: true,
+    headers: { apikey: STATS_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+    body: JSON.stringify({ sitzung: STATS_SESSION, app: location.pathname.includes('bissone') ? 'beta' : 'live', geraet: statsDevice(), version: APP_VERSION }),
+  }).catch(() => {});
+}
+pulse();
+setInterval(pulse, 60 * 1000);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') pulse(); });
 
 /* ---------- Sperre ---------- */
 // status.json im Repo steuert, ob die App gesperrt ist ("gesperrt": true/false).
