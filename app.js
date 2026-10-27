@@ -29,7 +29,7 @@ const DONATE_URL = 'https://paypal.me/MortenUkena';
 // Verbesserungswünsche gehen über Formspree direkt an den Entwickler. Leer lassen, um den Eintrag auszublenden.
 const WISH_URL = 'https://formspree.io/f/xeepbyjn';
 // Versionsnummer für die Anzeige in der App. Bei jedem Update zusammen mit VERSION in sw.js hochzählen.
-const APP_VERSION = '1.12.1';
+const APP_VERSION = '1.13.0';
 const KEY = 'kalorien.v1';
 const DEFAULTS = () => ({
   v: 1, setup: false, name: '', greeted: false, goals: { kcal: 2500, c: 280, p: 150, f: 80 }, weightKg: 80, days: {}, foods: {}, weights: [], lastBackup: null,
@@ -1522,36 +1522,35 @@ const RELOCK_KEY = 'biss.relock';
 const relocked = () => lsGet(RELOCK_KEY) === '1';
 const lockBypassed = () => !relocked() && (lsGet(OWNER_KEY) === '1' || lsGet(ACCESS_KEY) === ACCESS_HASH);
 const lockState = () => { try { return JSON.parse(lsGet(LOCK_KEY) || 'null'); } catch (e) { return null; } };
+let lockTick = 0;
+function hideLock(el) { clearInterval(lockTick); if (el) el.remove(); lockSig = ''; }
+// Edle Wartungs-Seite: filmischer Hintergrund, Statuszeile, Zugangscode
 function showLock(st) {
   let el = $('#lock');
-  if (!st || !st.gesperrt || lockBypassed()) { if (el) el.remove(); lockSig = ''; return; }
+  if (!st || !st.gesperrt || lockBypassed()) { hideLock(el); return; }
   const sig = JSON.stringify(st);
-  if (el && sig === lockSig) return; // nichts geändert: Spiel und Animation nicht neu starten
+  if (el && sig === lockSig) return; // nichts geändert: Animation nicht neu starten
   lockSig = sig;
   if (!el) { el = document.createElement('div'); el.id = 'lock'; el.setAttribute('role', 'alertdialog'); document.body.appendChild(el); }
-  const EM = ['🍎', '🥑', '🍌', '🥦', '🍗', '🥚', '🍓', '🥕', '💪', '🏋️', '🔥', '🥗', '🍳', '🏃'];
-  const floats = EM.map((e, i) => `<span style="left:${(i * 7.3 + Math.random() * 5) % 96}%;animation-duration:${9 + Math.random() * 8}s;animation-delay:-${Math.random() * 14}s;font-size:${20 + Math.random() * 16}px">${e}</span>`).join('');
-  const best = +(lsGet('biss.reps') || 0);
-  el.innerHTML = `<div class="lk-float" aria-hidden="true">${floats}</div><div class="hello">
-      <div class="lk-ic"><span class="lk-glow"></span><img src="icons/icon-192.png" alt="Hantel stemmen" class="hello-ic" id="lockIc">
-        <span class="lk-badge" id="lockBadge"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 10V7a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><rect x="5" y="10" width="14" height="11" rx="3" fill="currentColor"/></svg></span></div>
-      <h2 class="lk-in" style="animation-delay:.25s">${esc(st.titel || 'Biss ist gerade gesperrt')}</h2>
-      <p class="lk-in" style="animation-delay:.4s">${esc(st.text || 'Die App wird bald wieder freigegeben. Deine Daten bleiben erhalten.')}</p>
-      <form class="lk-code lk-in" id="lockForm" style="animation-delay:.5s" autocomplete="off"><input id="lockCode" type="text" placeholder="Zugangscode" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="go" aria-label="Zugangscode"><button type="submit">Öffnen</button></form>
-      <div class="lk-game lk-in" style="animation-delay:.55s"><b id="lockReps">0</b><span>Wiederholungen</span><small id="lockBest">${best ? `Rekord: ${best}` : 'Tipp aufs Icon und stemm die Hantel 💪'}</small></div>
+  const STEPS = st.schritte && st.schritte.length ? st.schritte : ['Neue Funktionen werden eingespielt', 'Lebensmittel-Datenbank wird optimiert', 'Feinschliff am Design', 'Gleich ist es so weit'];
+  el.innerHTML = `<div class="mx-bg" aria-hidden="true"><i class="o1"></i><i class="o2"></i><i class="o3"></i><i class="sweep"></i><i class="grain"></i><i class="vig"></i></div>
+    <div class="mx">
+      <button class="mx-tag mx-in" id="lockBadge" style="animation-delay:.1s"><span class="dot"></span>Biss · Wartung</button>
+      <div class="mx-ic mx-in" style="animation-delay:.25s"><span class="ring"></span><img src="icons/icon-192.png" alt=""><span class="gloss"></span></div>
+      <h2 class="mx-in" style="animation-delay:.45s">${esc(st.titel || 'Wartungsarbeiten')}</h2>
+      <p class="mx-sub mx-in" style="animation-delay:.6s">${esc(st.text || 'Wir machen Biss gerade noch besser. Gleich geht’s weiter.')}</p>
+      <div class="mx-bar mx-in" style="animation-delay:.75s"><i></i></div>
+      <div class="mx-step mx-in" style="animation-delay:.85s"><span id="lockStep">${esc(STEPS[0])}</span></div>
+      <form class="mx-code mx-in" id="lockForm" style="animation-delay:1s" autocomplete="off"><input id="lockCode" type="text" placeholder="Zugangscode" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="go" aria-label="Zugangscode"><button type="submit">Öffnen</button></form>
+      <p class="mx-foot mx-in" style="animation-delay:1.15s">Deine Daten bleiben sicher auf deinem iPhone.</p>
     </div>`;
-  // Minispiel: jedes Tippen aufs Icon ist eine Wiederholung
-  const ic = $('#lockIc', el), repsEl = $('#lockReps', el), bestEl = $('#lockBest', el), wrap = $('.lk-ic', el);
-  let reps = 0, rec = best;
-  const CHEER = { 10: 'Warm-up geschafft! 🔥', 25: 'Starke Arme! 💪', 50: 'Biest-Modus! 🦍', 100: 'Legende! 🏆' };
-  ic.addEventListener('click', ev => {
-    reps++; repsEl.textContent = reps;
-    ic.classList.remove('lk-rep'); void ic.offsetWidth; ic.classList.add('lk-rep');
-    const plus = document.createElement('span'); plus.className = 'lk-plus'; plus.textContent = '+1';
-    plus.style.left = (ev.offsetX || 52) + 'px'; wrap.appendChild(plus); setTimeout(() => plus.remove(), 700);
-    if (reps > rec) { rec = reps; lsSet('biss.reps', String(rec)); bestEl.textContent = `Neuer Rekord: ${rec} 🎉`; }
-    if (CHEER[reps]) { toast(CHEER[reps]); buzz(); }
-  });
+  // Statuszeile wechselt sanft
+  clearInterval(lockTick);
+  let si = 0; const stepEl = $('#lockStep', el);
+  lockTick = setInterval(() => {
+    stepEl.classList.add('out');
+    setTimeout(() => { si = (si + 1) % STEPS.length; stepEl.textContent = STEPS[si]; stepEl.classList.remove('out'); }, 450);
+  }, 3200);
   // Zugangscode: richtiger Code schaltet dieses Gerät frei
   $('#lockForm', el).addEventListener('submit', async ev => {
     ev.preventDefault();
@@ -1559,18 +1558,18 @@ function showLock(st) {
     if (!code) { inp.focus(); return; }
     if (await sha256(code) === ACCESS_HASH) {
       lsSet(ACCESS_KEY, ACCESS_HASH); try { localStorage.removeItem(RELOCK_KEY); } catch (e) { /* egal */ } inp.blur(); buzz();
-      el.classList.add('lk-out'); setTimeout(() => { el.remove(); lockSig = ''; confetti(); toast('Willkommen in Biss! 🎉'); render(); }, 450);
+      el.classList.add('mx-out'); setTimeout(() => { hideLock(el); confetti(); toast('Willkommen in Biss! 🎉'); render(); }, 700);
     } else {
-      const f = $('#lockForm', el); f.classList.remove('lk-no'); void f.offsetWidth; f.classList.add('lk-no');
+      const f = $('#lockForm', el); f.classList.remove('mx-no'); void f.offsetWidth; f.classList.add('mx-no');
       toast('Falscher Code'); inp.select();
     }
   });
-  // Für den Besitzer: 7× aufs Schloss tippen hebt die Sperre auf diesem Gerät auf
+  // Für den Besitzer: 7× auf „Biss · Wartung“ tippen hebt die Sperre auf diesem Gerät auf
   let taps = 0, tT;
   $('#lockBadge', el).addEventListener('click', () => {
     clearTimeout(tT); tT = setTimeout(() => { taps = 0; }, 2000);
     if (relocked()) return; // selbst gesperrt: nur der Zugangscode hilft
-    if (++taps >= 7) { lsSet(OWNER_KEY, '1'); el.remove(); lockSig = ''; toast('Sperre auf diesem Gerät aufgehoben'); render(); }
+    if (++taps >= 7) { lsSet(OWNER_KEY, '1'); hideLock(el); toast('Sperre auf diesem Gerät aufgehoben'); render(); }
   });
 }
 async function checkLock() {
