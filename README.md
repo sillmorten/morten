@@ -1,5 +1,7 @@
 # Biss
 
+Aktuelle Version: 1.22.0
+
 Kalorien- und Makro-Tracker fürs iPhone, ohne Abo, ohne Konto, ohne Werbung.
 Alle Daten bleiben lokal auf dem Gerät (localStorage). Lebensmittel kommen von
 [Open Food Facts](https://world.openfoodfacts.org) (ODbL).
