@@ -33,10 +33,10 @@ const WISH_URL = 'https://formspree.io/f/xeepbyjn';
 const STATS_URL = 'https://wfrtltqzhmeaildtlxga.supabase.co';
 const STATS_KEY = 'sb_publishable_Ic-sGCsYX6A3977v6kDEQA_i0W63MOG';
 // Versionsnummer für die Anzeige in der App. Bei jedem Update zusammen mit VERSION in sw.js hochzählen.
-const APP_VERSION = '1.20.0';
+const APP_VERSION = '1.21.0';
 const KEY = 'kalorien.v1';
 const DEFAULTS = () => ({
-  v: 1, setup: false, name: '', greeted: false, goals: { kcal: 2500, c: 280, p: 150, f: 80 }, weightKg: 80, days: {}, foods: {}, weights: [], lastBackup: null, bkRemind: 7, bkSnooze: 0,
+  v: 1, setup: false, name: '', greeted: false, goals: { kcal: 2500, c: 280, p: 150, f: 80 }, weightKg: 80, days: {}, foods: {}, weights: [], weighRem: 0, weighSkip: '', lastBackup: null, bkRemind: 7, bkSnooze: 0,
   supps: [{ id: 'kreatin', name: 'Kreatin', dose: '5 g' }, { id: 'shake', name: 'Protein-Shake', dose: '' }, { id: 'vitamine', name: 'Vitamine', dose: '' }],
   suppLog: {}, body: [], photos: [], badges: null, profile: null,
 });
@@ -169,7 +169,7 @@ function viewToday() {
   <h1 class="lt" data-act="calendar"><small>${longDate(cur)}${kdate(cur).getFullYear() !== new Date().getFullYear() ? ' ' + kdate(cur).getFullYear() : ''}</small>${dayTitle(cur)}</h1>
   ${isToday && S.name ? `<p class="greet">${greeting()}</p>` : ''}
   ${isToday ? streakPill() : ''}
-  ${isToday && backupDue() ? backupBanner() : ''}
+  ${weighDue() ? weighBanner() : isToday && backupDue() ? backupBanner() : ''}
   <section class="card hero">
     <div class="ringwrap">${ring(over ? 1 : (avail ? t.kcal / avail : 0), over ? 'var(--org)' : 'var(--tint)', { size: 140, stroke: 18 })}
       <div class="ringlabel"><b class="num">${n0(Math.abs(left))}</b><span>${over ? 'kcal zu viel' : 'kcal übrig'}</span></div></div>
@@ -182,6 +182,7 @@ function viewToday() {
   <section class="mac">
     ${macro(t.c, g.c, 'var(--org)', 'Kohlenhydrate')}${macro(t.p, g.p, 'var(--grn)', 'Eiweiß')}${macro(t.f, g.f, 'var(--blu)', 'Fett')}
   </section>
+  ${weighRow()}
   ${IDEAS.length ? `<section class="list icons"><button class="it" data-act="ideas">${tile('bowl', ['#5ac8fa', '#1a8fd6'])}<div class="n"><b>Essensideen 💡</b><span>${ideasSub()}</span></div><span class="chev">${icon('right')}</span></button></section>` : ''}
   <div class="hdr"><span>Mahlzeiten</span></div>
   <section class="list icons">
@@ -249,7 +250,7 @@ function viewHistory() {
     days = Object.entries(byM).map(([m, xs]) => { const [y, mm] = m.split('-').map(Number); return `<div class="hdr"><span>${MONL[mm - 1]} ${y}</span><span>${xs.length} ${xs.length === 1 ? 'Tag' : 'Tage'}</span></div><section class="list">${xs.map(dayRow).join('')}</section>`; }).join('');
   }
   const lastW = S.weights.length ? S.weights[S.weights.length - 1] : null;
-  const wDiff = weightDiff(30);
+  const wDiff = weightDiff(30), wPace = weightPace();
   const pAvg = avg('p');
   const backupAge = bkAge();
   const hasAny = Object.keys(S.days).length > 0;
@@ -276,7 +277,7 @@ function viewHistory() {
   <section class="list icons">
     <div class="it">${tile('egg', ['#4ee37a', '#24b34b'])}<div class="n"><b>Eiweiß</b><span>${base.length ? `Ø ${n0(pAvg)} g · Ziel ${n0(S.goals.p)} g` : 'Keine Daten in diesem Zeitraum'}</span></div>${base.length && pAvg >= S.goals.p * .95 ? `<span style="color:var(--grn);font-size:22px">${icon('check')}</span>` : ''}</div>
     <div class="it"><span class="ic" style="background:linear-gradient(180deg,#ffb340,#ff8a00)">${icon('bolt')}</span><div class="n"><b>Makros im Schnitt</b><span>${base.length ? `${n0(avg('c'))} g KH · ${n0(pAvg)} g Eiweiß · ${n0(avg('f'))} g Fett` : 'Keine Daten in diesem Zeitraum'}</span></div></div>
-    <button class="it" data-act="weight">${tile('scales', ['#40a0ff', '#0a6fe0'])}<div class="n"><b>Körpergewicht</b><span>${lastW ? `${n1(lastW.kg)} kg${wDiff !== null ? ` · ${wDiff > 0 ? '+' : wDiff < 0 ? '−' : '±'}${n1(Math.abs(wDiff))} kg in 30 Tagen` : ''}` : 'Gewicht eintragen'}</span></div><span class="chev">${icon('right')}</span></button>
+    <button class="it" data-act="weight">${tile('scales', ['#40a0ff', '#0a6fe0'])}<div class="n"><b>Körpergewicht</b><span>${lastW ? `${n1(lastW.kg)} kg${wPace !== null ? ` · ${signKg(wPace)} pro Woche` : wDiff !== null ? ` · ${signKg(wDiff)} in 30 Tagen` : ''}` : 'Morgens nüchtern wiegen'}</span></div><span class="chev">${icon('right')}</span></button>
     <button class="it" data-act="body">${tile('ruler', ['#5ac8fa', '#1a9bd7'])}<div class="n"><b>Körpermaße & Fotos</b><span>${bodySub()}</span></div><span class="chev">${icon('right')}</span></button>
     <button class="it" data-act="badges">${tile('trophy', ['#ffd60a', '#f5a300'])}<div class="n"><b>Streaks & Abzeichen</b><span>${earnedCount()} von ${BADGES.length} Abzeichen</span></div><span class="chev">${icon('right')}</span></button>
     <button class="it" data-act="backup">${tile('cloud', backupAge !== null && backupAge < 30 || !hasAny ? ['#a1a1a6', '#6e6e73'] : ['#ffb340', '#ff8a00'])}<div class="n"><b>Backup</b><span>${backupSub}</span></div><span class="chev">${icon('right')}</span></button>
@@ -912,31 +913,171 @@ function openHealthHelp() {
 }
 
 /* ---------- Gewicht ---------- */
-let wRange = 90;
+let wRange = 30;
 // Einträge der letzten n Tage (0 = alle)
 const sinceDays = (list, n) => n ? list.filter(x => x.date >= addDays(todayKey(), -n)) : list;
-const rangeSeg = (cur, attr) => `<div class="seg">${[[90, '3 Monate'], [365, 'Jahr'], [0, 'Alles']].map(([n, l]) => `<button class="${cur === n ? 'on' : ''}" ${attr}="${n}">${l}</button>`).join('')}</div>`;
-function openWeight() {
+const rangeSeg = (cur, attr, opts = [[90, '3 Monate'], [365, 'Jahr'], [0, 'Alles']]) => `<div class="seg">${opts.map(([n, l]) => `<button class="${cur === n ? 'on' : ''}" ${attr}="${n}">${l}</button>`).join('')}</div>`;
+const W_RANGES = [[30, 'Monat'], [90, '3 Monate'], [365, 'Jahr'], [0, 'Alles']];
+const weightOn = k => S.weights.find(w => w.date === k);
+const weightBefore = k => { for (let i = S.weights.length - 1; i >= 0; i--) if (S.weights[i].date < k) return S.weights[i]; return null; };
+const signKg = (d, digits = 1) => `${d > 0.04 ? '+' : d < -0.04 ? '−' : '±'}${digits ? n1(Math.abs(d)) : n0(Math.abs(d))} kg`;
+// Gleitender Wochenschnitt: Mittel aller Wiegungen der 7 Tage bis einschließlich k
+function weekAvg(k) {
+  const from = addDays(k, -6), xs = S.weights.filter(x => x.date >= from && x.date <= k);
+  return xs.length ? xs.reduce((a, x) => a + x.kg, 0) / xs.length : null;
+}
+// Tempo in kg pro Woche: Trendlinie durch die Wiegungen der letzten 4 Wochen
+function weightPace(days = 28) {
+  const w = S.weights; if (w.length < 3) return null;
+  const last = w[w.length - 1].date, xs = w.filter(x => x.date >= addDays(last, -(days - 1)));
+  if (xs.length < 3) return null;
+  const t = xs.map(x => Math.round((kdate(x.date) - kdate(xs[0].date)) / 864e5));
+  if (t[t.length - 1] < 6) return null;
+  const mt = t.reduce((a, v) => a + v, 0) / t.length, my = xs.reduce((a, x) => a + x.kg, 0) / xs.length;
+  let sxy = 0, sxx = 0; xs.forEach((x, i) => { sxy += (t[i] - mt) * (x.kg - my); sxx += (t[i] - mt) ** 2; });
+  return sxx ? sxy / sxx * 7 : null;
+}
+// Plan aus dem Ziel-Rechner (zunehmen/abnehmen), falls vorhanden
+function weightPlan() {
+  const pr = S.profile; if (!pr) return null;
+  const r = calcGoals({ ...pr, weight: S.weights.length ? S.weights[S.weights.length - 1].kg : S.weightKg });
+  return r && r.mode !== 'keep' ? { mode: r.mode, pace: r.realPace, target: r.target } : null;
+}
+const weekStart = k => addDays(k, -((kdate(k).getDay() + 6) % 7));
+function weekRows(list) {
+  const by = {}; for (const x of list) (by[weekStart(x.date)] ||= []).push(x.kg);
+  const ws = Object.keys(by).sort().map(k => ({ k, n: by[k].length, avg: by[k].reduce((a, v) => a + v, 0) / by[k].length, lo: Math.min(...by[k]), hi: Math.max(...by[k]) }));
+  ws.forEach((w, i) => { w.diff = i ? w.avg - ws[i - 1].avg : null; });
+  return ws.reverse();
+}
+const weighStreak = () => { const set = new Set(S.weights.map(w => w.date)); return streakInfo(k => set.has(k), [...set]); };
+// Tägliche Erinnerung in der App: ab der gewählten Uhrzeit, solange heute noch nicht gewogen
+const WEIGH_TIMES = [[0, 'Aus'], [6, '6 Uhr'], [7, '7 Uhr'], [8, '8 Uhr'], [9, '9 Uhr']];
+function weighDue() {
+  const t = todayKey();
+  return !!S.weighRem && cur === t && new Date().getHours() >= S.weighRem && S.weighSkip !== t && !weightOn(t);
+}
+function weighBanner() {
+  return `<section class="bkbanner wbanner">${tile('scales', ['#40a0ff', '#0a6fe0'])}<div class="n"><b>Zeit zum Wiegen ⚖️</b><span>Morgens nüchtern, vor dem Frühstück</span></div><button class="pillbtn" data-act="weight">Wiegen</button><button class="xb" data-act="weighSkip" aria-label="Heute nicht">${icon('x')}</button></section>`;
+}
+// Zeile auf „Heute“: Gewicht des Tages oder Aufforderung zum Wiegen
+function weighRow() {
+  const w = weightOn(cur), prev = weightBefore(cur), isToday = cur === todayKey();
+  const sub = w ? `${n1(w.kg)} kg${prev ? ` · ${signKg(w.kg - prev.kg)} zum ${addDays(cur, -1) === prev.date ? 'Vortag' : shortDate(prev.date)}` : ''}`
+    : isToday ? 'Noch nicht gewogen · antippen zum Eintragen' : 'An diesem Tag nicht gewogen';
+  return `<section class="list icons"><button class="it" data-act="weight" data-k="${cur}">${tile('scales', ['#40a0ff', '#0a6fe0'])}<div class="n"><b>${w ? 'Gewicht' : 'Morgens nüchtern wiegen'}</b><span>${sub}</span></div>${w ? `<span class="chk on">${icon('check')}</span>` : `<span class="plus">${icon('plus')}</span>`}</button></section>`;
+}
+let wShowAll = false;
+function openWeight(day = todayKey()) {
+  wShowAll = false;
   openLayer('sheet', `<div id="wBody" style="display:flex;flex-direction:column;gap:14px"></div>`, el => {
     const draw = () => {
-      const w = S.weights, last = w[w.length - 1], ws = sinceDays(w, wRange);
+      const w = S.weights, last = w[w.length - 1], ws = sinceDays(w, wRange), here = weightOn(day), isToday = day === todayKey();
+      const st = weighStreak(), pace = weightPace(), plan = weightPlan();
+      const lastAvg = last ? weekAvg(last.date) : null;
+      let stats = '';
+      if (w.length >= 2) {
+        const hi = ws.reduce((a, x) => x.kg >= (a ? a.kg : -1) ? x : a, null), lo = ws.reduce((a, x) => x.kg <= (a ? a.kg : 1e9) ? x : a, null);
+        const span = ws.length >= 2 ? ws[ws.length - 1].kg - ws[0].kg : null;
+        const box = (k, v, s, cls = '') => `<div class="wst"><span>${k}</span><b class="num ${cls}">${v}</b><em>${s}</em></div>`;
+        const good = d => !plan ? '' : (plan.mode === 'gain' ? d > 0.05 : d < -0.05) ? 'up' : '';
+        let planTxt = '';
+        if (plan && pace !== null) {
+          const want = plan.mode === 'gain' ? plan.pace : -plan.pace, ratio = want ? pace / want : 0;
+          planTxt = ratio >= 0.7 && ratio <= 1.6 ? `👍 Du liegst im Plan (${signKg(want)} pro Woche).`
+            : ratio > 1.6 ? `Du bist schneller als geplant (Plan ${signKg(want)} pro Woche).${plan.mode === 'gain' ? ' Etwas weniger essen hält es sauber.' : ''}`
+            : plan.mode === 'gain' ? `Du nimmst langsamer zu als geplant (${signKg(want)} pro Woche). Iss jeden Tag etwas mehr, z. B. einen Snack extra.`
+            : `Du nimmst langsamer ab als geplant (${signKg(want)} pro Woche).`;
+        }
+        const weeks = weekRows(ws), wk = weeks.slice(0, wShowAll ? weeks.length : 8);
+        stats = `
+        <div class="hdr"><span>Statistik</span></div>
+        ${rangeSeg(wRange, 'data-wr', W_RANGES)}
+        <section class="card wchart">
+          <div class="ctop">Wochenschnitt</div>
+          <div class="big"><b class="num">${lastAvg !== null ? n1(lastAvg) : '–'}</b><span>kg${pace !== null ? ` · ${signKg(pace)} pro Woche` : ''}</span></div>
+          ${ws.length >= 2 ? weighChart(ws, plan && plan.target) : '<p class="empty">Zu wenige Einträge in diesem Zeitraum.</p>'}
+          ${ws.length >= 2 ? `<div class="wlegend"><span><i class="dot"></i>Tageswert</span><span><i class="line"></i>Wochenschnitt</span><span><i class="hi"></i>Hoch</span><span><i class="lo"></i>Tief</span></div>` : ''}
+        </section>
+        <div class="wgrid">
+          ${box('Pro Woche', pace !== null ? signKg(pace) : '–', pace !== null ? 'Trend der letzten 4 Wochen' : 'ab 1 Woche Wiegen', pace !== null ? good(pace) : '')}
+          ${box('Im Zeitraum', span !== null ? signKg(span) : '–', ws.length ? `seit ${shortDate(ws[0].date)}` : '', span !== null ? good(span) : '')}
+          ${box('Hoch', hi ? `${n1(hi.kg)} kg` : '–', hi ? shortDate(hi.date) : '', 'hi')}
+          ${box('Tief', lo ? `${n1(lo.kg)} kg` : '–', lo ? shortDate(lo.date) : '', 'lo')}
+        </div>
+        ${planTxt ? `<p class="note">${planTxt}</p>` : ''}
+        <p class="note">Am Tag schwankt das Gewicht oft um 0,5 bis 1 kg (Wasser, Salz, Essen). Achte vor allem auf den Wochenschnitt.</p>
+        ${weeks.length ? `<div class="hdr"><span>Pro Woche</span><span>Ø</span></div><section class="list">${wk.map(x => `<div class="it"><div class="n"><b>KW ${isoWeek(kdate(x.k))} · ${fmtD(x.k)} – ${fmtD(addDays(x.k, 6))}</b><span>${x.n}× gewogen · ${n1(x.lo)} bis ${n1(x.hi)} kg</span></div><span class="k num">${n1(x.avg)} kg${x.diff !== null ? `<br><small class="${good(x.diff) ? 'up' : ''}">${signKg(x.diff)}</small>` : ''}</span></div>`).join('')}</section>` : ''}`;
+      }
+      const list = w.slice().reverse(), shown = wShowAll ? list : list.slice(0, 14);
       $('#wBody', el).innerHTML = `
         <div class="sh"><div class="t"><b>Körpergewicht</b><span>${last ? `Zuletzt ${n1(last.kg)} kg am ${shortDate(last.date)}` : 'Noch kein Eintrag'}</span></div><button class="xb" data-act="close" aria-label="Schließen">${icon('x')}</button></div>
-        <div class="amt"><input id="wk" inputmode="decimal" placeholder="${last ? n1(last.kg) : '80,0'}" aria-label="Gewicht in kg"><span>kg</span></div>
-        <button class="btn" id="wOk">Für heute speichern</button>
-        ${w.length >= 2 ? `${rangeSeg(wRange, 'data-wr')}<section class="card wchart">${ws.length >= 2 ? weightChart(ws) : '<p class="empty">Zu wenige Einträge in diesem Zeitraum.</p>'}</section>` : ''}
-        ${w.length ? `<div class="hdr"><span>Alle Einträge</span><span>${w.length}</span></div><section class="list">${w.slice().reverse().map(x => `<div class="it"><div class="n"><b>${n1(x.kg)} kg</b><span>${shortDate(x.date)}</span></div><button class="xb" data-wdel="${x.date}" aria-label="Löschen" style="color:var(--red)">${icon('trash')}</button></div>`).join('')}</section>` : ''}`;
+        <section class="card wtip"><b>⚖️ Morgens nüchtern wiegen</b><span>Am besten jeden Tag zur gleichen Zeit, vor dem Frühstück und ohne Kleidung. So sind die Werte vergleichbar.</span></section>
+        <div class="amt"><input id="wk" inputmode="decimal" value="${here ? n1(here.kg) : ''}" placeholder="${last ? n1(last.kg) : '80,0'}" aria-label="Gewicht in kg"><span>kg</span></div>
+        <button class="btn" id="wOk">${here ? 'Ändern' : isToday ? 'Für heute speichern' : `Für ${shortDate(day)} speichern`}</button>
+        ${st.cur > 1 || st.best > 1 ? `<p class="note wstreak">🔥 ${st.cur > 1 ? `<b>${st.cur} Tage</b> am Stück gewogen` : 'Heute wiegen und Serie starten'}${st.best > 1 ? ` · Rekord ${st.best}` : ''}</p>` : ''}
+        ${stats}
+        <div class="hdr"><span>Tägliche Erinnerung</span></div>
+        <div class="seg" id="wRem">${WEIGH_TIMES.map(([h, l]) => `<button data-h="${h}" class="${(S.weighRem || 0) === h ? 'on' : ''}">${l}</button>`).join('')}</div>
+        <p class="foot">${S.weighRem ? `Ab ${S.weighRem} Uhr erinnert dich Biss auf „Heute“, solange du noch nicht gewogen hast.` : 'Biss kann dich morgens auf „Heute“ ans Wiegen erinnern.'}</p>
+        ${S.weighRem ? `<section class="list icons"><button class="it" id="wCal">${tile('calendar', ['#ff5c7c', '#e8264d'])}<div class="n"><b>Als Handy-Erinnerung</b><span>Täglich um ${S.weighRem}:00 Uhr in deinen Kalender eintragen</span></div><span class="chev">${icon('right')}</span></button></section>` : ''}
+        ${w.length ? `<div class="hdr"><span>Alle Einträge</span><span>${w.length}</span></div><section class="list">${shown.map((x, i) => { const p = list[list.indexOf(x) + 1]; return `<div class="it"><div class="n"><b>${n1(x.kg)} kg</b><span>${shortDate(x.date)}${p ? ` · ${signKg(x.kg - p.kg)}` : ''}</span></div><button class="xb" data-wdel="${x.date}" aria-label="Löschen" style="color:var(--red)">${icon('trash')}</button></div>`; }).join('')}</section>
+        ${list.length > shown.length || (wShowAll && list.length > 14) ? `<button class="btn sec" id="wAll">${wShowAll ? 'Weniger anzeigen' : `Alle ${list.length} Einträge anzeigen`}</button>` : ''}` : ''}`;
       fitAmt($('#wk', el));
       $('#wOk', el).addEventListener('click', () => {
         const kg = num($('#wk', el).value); if (!(kg > 20 && kg < 400)) { toast('Bitte ein gültiges Gewicht eingeben'); return; }
-        const t = todayKey(); S.weights = S.weights.filter(x => x.date !== t); S.weights.push({ date: t, kg }); S.weights.sort((a, b) => a.date.localeCompare(b.date));
-        S.weightKg = kg; save(); buzz(); render(); draw(); toast('Gewicht gespeichert');
+        S.weights = S.weights.filter(x => x.date !== day); S.weights.push({ date: day, kg }); S.weights.sort((a, b) => a.date.localeCompare(b.date));
+        if (S.weights[S.weights.length - 1].date === day) S.weightKg = kg;
+        save(); buzz(); render(); draw(); toast('Gewicht gespeichert');
       });
       el.querySelectorAll('[data-wr]').forEach(b => b.addEventListener('click', () => { wRange = +b.dataset.wr; draw(); }));
-      el.querySelectorAll('[data-wdel]').forEach(b => b.addEventListener('click', () => { S.weights = S.weights.filter(x => x.date !== b.dataset.wdel); save(); render(); draw(); }));
+      $('#wRem', el).addEventListener('click', ev => { const b = ev.target.closest('button'); if (!b) return; S.weighRem = +b.dataset.h; save(); render(); draw(); });
+      const cal = $('#wCal', el); if (cal) cal.addEventListener('click', weighCalendar);
+      const all = $('#wAll', el); if (all) all.addEventListener('click', () => { wShowAll = !wShowAll; draw(); });
+      // Löschen erst nach zweitem Tippen, damit nichts aus Versehen verschwindet
+      el.querySelectorAll('[data-wdel]').forEach(b => b.addEventListener('click', () => {
+        if (!b.dataset.sure) { b.dataset.sure = 1; b.classList.add('sure'); b.textContent = 'Löschen?'; setTimeout(() => { if (b.isConnected) { delete b.dataset.sure; b.classList.remove('sure'); b.innerHTML = icon('trash'); } }, 3000); return; }
+        S.weights = S.weights.filter(x => x.date !== b.dataset.wdel); save(); render(); draw(); toast('Eintrag gelöscht');
+      }));
     };
     draw();
   });
+}
+// Kalender-Termin (täglich) mit Hinweis, damit das Handy auch ohne geöffnete App erinnert
+function weighCalendar() {
+  const h = pad(S.weighRem || 7), t = addDays(todayKey(), 1).replace(/-/g, '');
+  const now = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+/, '');
+  const ics = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Biss//Wiegen//DE', 'CALSCALE:GREGORIAN', 'BEGIN:VEVENT',
+    `UID:biss-wiegen-${uid()}@biss`, `DTSTAMP:${now}`, `DTSTART:${t}T${h}0000`, 'DURATION:PT5M', 'RRULE:FREQ=DAILY',
+    'SUMMARY:⚖️ Morgens nüchtern wiegen', 'DESCRIPTION:Vor dem Frühstück wiegen und in Biss eintragen.', `URL:${location.origin + location.pathname}`,
+    'BEGIN:VALARM', 'ACTION:DISPLAY', 'DESCRIPTION:Morgens nüchtern wiegen', 'TRIGGER:PT0M', 'END:VALARM', 'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/calendar;charset=utf-8,' + encodeURIComponent(ics); a.download = 'biss-wiegen.ics';
+  document.body.appendChild(a); a.click(); setTimeout(() => a.remove(), 1000);
+}
+function weighChart(w, target) {
+  const W = 320, H = 170, L = 34, R = 8, T = 14, B = 22;
+  const xs = w.map(x => kdate(x.date).getTime()), ys = w.map(x => x.kg), av = w.map(x => weekAvg(x.date));
+  let y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const showT = target && target > y0 - 1.5 && target < y1 + 1.5;
+  if (showT) { y0 = Math.min(y0, target); y1 = Math.max(y1, target); }
+  if (y1 - y0 < 2) { const m = (y0 + y1) / 2; y0 = m - 1; y1 = m + 1; }
+  y0 = Math.floor(y0 - 0.2); y1 = Math.ceil(y1 + 0.2);
+  const x0 = xs[0], x1 = xs[xs.length - 1] || x0 + 1;
+  const X = t => L + (t - x0) / Math.max(1, x1 - x0) * (W - L - R), Y = v => T + (1 - (v - y0) / (y1 - y0)) * (H - T - B);
+  const ticks = [y0, (y0 + y1) / 2, y1];
+  const iHi = ys.lastIndexOf(Math.max(...ys)), iLo = ys.lastIndexOf(Math.min(...ys));
+  const r = w.length > 60 ? 1.6 : w.length > 30 ? 2.2 : 3;
+  const line = av.map((v, i) => `${X(xs[i]).toFixed(1)},${Y(v).toFixed(1)}`).join(' ');
+  const mark = (i, cls, lbl, up) => `<circle cx="${X(xs[i]).toFixed(1)}" cy="${Y(ys[i]).toFixed(1)}" r="4.5" class="${cls}" style="stroke:var(--sheetcard)" stroke-width="2"/><text x="${Math.min(W - R - 14, Math.max(L + 14, X(xs[i]))).toFixed(1)}" y="${(Y(ys[i]) + (up ? -8 : 15)).toFixed(1)}" text-anchor="middle" font-size="10" font-weight="700" class="${cls}">${lbl}</text>`;
+  return `<svg viewBox="0 0 ${W} ${H}" style="overflow:visible">
+    ${ticks.map(v => `<line x1="${L}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}" style="stroke:var(--sep)" stroke-width="1"/><text x="${L - 6}" y="${Y(v) + 4}" text-anchor="end" font-size="10" style="fill:var(--l2)">${n1(v)}</text>`).join('')}
+    ${showT ? `<line x1="${L}" x2="${W - R}" y1="${Y(target).toFixed(1)}" y2="${Y(target).toFixed(1)}" style="stroke:var(--grn)" stroke-width="1.5" stroke-dasharray="4 4"/><text x="${W - R}" y="${(Y(target) - 4).toFixed(1)}" text-anchor="end" font-size="10" style="fill:var(--grn)">Ziel ${n1(target)}</text>` : ''}
+    ${w.map((x, i) => `<circle cx="${X(xs[i]).toFixed(1)}" cy="${Y(ys[i]).toFixed(1)}" r="${r}" style="fill:color-mix(in srgb, var(--blu) 45%, transparent)"/>`).join('')}
+    <polyline points="${line}" fill="none" style="stroke:var(--blu)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+    ${iHi !== iLo ? mark(iHi, 'whi', 'Hoch', true) + mark(iLo, 'wlo', 'Tief', false) : ''}
+    <text x="${L}" y="${H - 5}" font-size="10" style="fill:var(--l2)">${shortDate(w[0].date)}</text>
+    <text x="${W - R}" y="${H - 5}" font-size="10" text-anchor="end" style="fill:var(--l2)">${shortDate(w[w.length - 1].date)}</text></svg>`;
 }
 function weightChart(w, key = 'kg', color = 'var(--blu)') {
   const W = 320, H = 160, L = 34, R = 8, T = 10, B = 22;
@@ -1595,7 +1736,8 @@ const ACT = {
     const f = S.foods[e.foodId] || { id: null, name: e.name, ...(e.per || { kcal: e.kcal / e.g * 100, c: e.c / e.g * 100, p: e.p / e.g * 100, f: e.f / e.g * 100 }) };
     openAmount({ ...f, ...(e.per || {}), name: e.name }, { entry: e, day: mealSheet.day });
   },
-  weight: () => openWeight(),
+  weight: b => openWeight(b.dataset.k || todayKey()),
+  weighSkip: () => { S.weighSkip = todayKey(); save(); render(); toast('Heute keine Erinnerung mehr'); },
   body: () => openBody(),
   badges: () => openBadges(),
   supps: () => openSupps(),
@@ -1843,7 +1985,7 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 
 /* ---------- Update-Hinweis ---------- */
 // Wird jedem bestehenden Nutzer einmal gezeigt. Für die nächste Neuigkeit NEWS_ID ändern und Text anpassen.
-const NEWS_ID = 'ideen-2026-10';
+const NEWS_ID = 'wiegen-2026-11';
 function openNews() {
   S.seenNews = NEWS_ID; save();
   const row = (ic, g, b, t) => `<div class="it">${tile(ic, g)}<div class="n news-n"><b>${b}</b><span>${t}</span></div></div>`;
@@ -1851,16 +1993,16 @@ function openNews() {
     <div class="hello">
       <img src="icons/icon-192.png" alt="" class="hello-ic">
       <h2>Biss hat ein Update 🎉</h2>
-      <p>Neu: Essensideen zum Abnehmen oder Zunehmen, passend zu deinem Tag.</p>
+      <p>Neu: tägliches Wiegen mit Statistik. Deine bisherigen Gewichte sind alle mit drin.</p>
     </div>
     <section class="list icons bklist">
-      ${row('bowl', ['#5ac8fa', '#1a8fd6'], 'Fast 40 Gerichte und Snacks', 'Vom Skyr-Bowl bis zum Masse-Shake, jeweils mit Kalorien und Eiweiß.')}
-      ${row('target', ['#ff5c7c', '#e8264d'], 'Passend zu deinem Ziel', 'Sortiert nach den Kalorien und dem Eiweiß, die dir heute noch fehlen.')}
-      ${row('plus', ['#4ee37a', '#24b34b'], 'Mit einem Tipp eingetragen', 'Ganzes, halbes oder anderthalb Gerichte, wie du magst.')}
+      ${row('scales', ['#40a0ff', '#0a6fe0'], 'Morgens nüchtern wiegen', 'Direkt auf „Heute“ eintragen, mit Vergleich zum Vortag.')}
+      ${row('bars', ['#4ee37a', '#24b34b'], 'Statistik', 'Wochenschnitt, Hoch und Tief und wie viel du pro Woche zu- oder abnimmst.')}
+      ${row('calendar', ['#ff5c7c', '#e8264d'], 'Tägliche Erinnerung', 'Wenn du magst, erinnert dich Biss jeden Morgen ans Wiegen.')}
     </section>
-    <button class="btn" id="nwGo">Essensideen ansehen</button>
+    <button class="btn" id="nwGo">Jetzt wiegen</button>
     <button class="btn del" data-act="close" style="color:var(--l2)">Später</button>`, el => {
-    $('#nwGo', el).addEventListener('click', () => { closeTop(); setTimeout(() => openIdeas(), 330); });
+    $('#nwGo', el).addEventListener('click', () => { closeTop(); setTimeout(() => openWeight(), 330); });
   });
   confetti();
 }
