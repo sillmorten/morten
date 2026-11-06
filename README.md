@@ -11,7 +11,7 @@ Alle Daten bleiben lokal auf dem Gerät (localStorage). Lebensmittel kommen von
 - Eintragen per Suche, Barcode-Scan, eigene Lebensmittel oder Schnelleintrag
 - Sport eintragen (Schätzung über Dauer und Gewicht) oder Wert aus Apple Health per Kurzbefehl einfügen
 - Verlauf nach Woche, Monat, Jahr oder alles, beliebig weit zurückblättern, Kalender zum Springen auf jeden Tag
-- Körpergewicht mit komplettem Verlauf
+- Körpergewicht: täglich „morgens nüchtern wiegen“ direkt auf „Heute“, Statistik mit gleitendem Wochenschnitt, Hoch und Tief, Veränderung pro Woche (Trend der letzten 4 Wochen), Wochenliste, Vergleich mit dem Plan aus dem Ziel-Rechner, tägliche Erinnerung in der App und optional als Kalender-Termin
 - Backup als Datei (z. B. iCloud Drive): Übersicht, was drin ist, Erinnerung (wöchentlich/monatlich), Wiederherstellen per Ersetzen oder Zusammenführen, letzte Wiederherstellung rückgängig machbar
 - Streaks und Abzeichen (Tage im Ziel, Tage eingetragen, Eiweiß, Supplements)
 - Körpermaße mit Verlauf und Fortschrittsfotos (verkleinert in IndexedDB, im Backup enthalten)

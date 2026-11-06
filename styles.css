@@ -408,3 +408,29 @@ i.o { background: var(--org); }
 .list.recipe .no { width: 24px; height: 24px; flex: none; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 700; color: #fff; background: var(--tint); margin-top: 1px; }
 .list.recipe .n span { white-space: normal; font-size: 15px; color: var(--l1); line-height: 1.4; margin-top: 2px; }
 .list.recipe .it + .it::before { left: 52px; }
+
+/* Tägliches Wiegen */
+.wtip { display: flex; flex-direction: column; gap: 3px; }
+.wtip b { font-size: 16px; font-weight: 600; }
+.wtip span { font-size: 14px; color: var(--l2); line-height: 1.4; }
+.wbanner { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--blu) 35%, transparent); }
+.wstreak { margin-top: -4px; }
+.wstreak b { color: var(--tint); }
+.wgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; flex: none; }
+.wst { background: var(--sheetcard); border-radius: 14px; padding: 10px 12px; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.wst span { font-size: 12px; color: var(--l2); font-weight: 600; text-transform: uppercase; }
+.wst b { font-size: 21px; font-weight: 700; letter-spacing: -.02em; }
+.wst em { font-style: normal; font-size: 12px; color: var(--l2); }
+.wst b.up, .it .k small.up { color: var(--grn); }
+.wst b.hi, .whi { fill: var(--org); color: var(--org); }
+.wst b.lo, .wlo { fill: var(--blu); color: var(--blu); }
+.it .k small { font-size: 13px; color: var(--l2); }
+.it .k:has(small) { text-align: right; line-height: 1.25; }
+.wlegend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 8px; font-size: 12px; color: var(--l2); }
+.wlegend span { display: flex; align-items: center; gap: 5px; }
+.wlegend i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
+.wlegend .dot { background: color-mix(in srgb, var(--blu) 45%, transparent); }
+.wlegend .line { width: 14px; height: 3px; border-radius: 2px; background: var(--blu); }
+.wlegend .hi { background: var(--org); }
+.wlegend .lo { background: var(--blu); }
+.xb.sure { width: auto; padding: 0 10px; border-radius: 14px; font-size: 13px; font-weight: 600; background: color-mix(in srgb, var(--red) 14%, transparent); }
