@@ -33,7 +33,7 @@ const WISH_URL = 'https://formspree.io/f/xeepbyjn';
 const STATS_URL = 'https://wfrtltqzhmeaildtlxga.supabase.co';
 const STATS_KEY = 'sb_publishable_Ic-sGCsYX6A3977v6kDEQA_i0W63MOG';
 // Versionsnummer für die Anzeige in der App. Bei jedem Update zusammen mit VERSION in sw.js hochzählen.
-const APP_VERSION = '1.21.0';
+const APP_VERSION = '1.22.0';
 const KEY = 'kalorien.v1';
 const DEFAULTS = () => ({
   v: 1, setup: false, name: '', greeted: false, goals: { kcal: 2500, c: 280, p: 150, f: 80 }, weightKg: 80, days: {}, foods: {}, weights: [], weighRem: 0, weighSkip: '', lastBackup: null, bkRemind: 7, bkSnooze: 0,
@@ -148,7 +148,7 @@ function viewToday() {
   const over = left < 0;
   const isToday = cur === todayKey();
   const prev = addDays(cur, -1), next = addDays(cur, 1);
-  const macro = (v, goal, col, name) => `<div class="mc">${ring(goal ? v / goal : 0, col, { size: 46, stroke: 7 })}<div class="v num">${n0(v)}<em> / ${n0(goal)} g</em></div><div class="k">${name}</div></div>`;
+  const macro = (v, goal, col, name, m) => { const rest = goal - v; return `<button class="mc" data-act="macroTips" data-m="${m}" aria-label="${name}: Tipps zum Steigern">${ring(goal ? v / goal : 0, col, { size: 46, stroke: 7 })}<div class="v num">${n0(v)}<em> / ${n0(goal)} g</em></div><div class="k">${name}</div>${goal > 0 ? `<div class="rest${rest >= 1 ? '' : ' ok'}">${rest >= 1 ? `noch ${n0(rest)} g ›` : 'Ziel erreicht ✓'}</div>` : ''}</button>`; };
   const meals = MEALS.map(m => {
     const es = d.food.filter(e => e.meal === m.id);
     const kc = es.reduce((a, e) => a + e.kcal, 0);
@@ -180,7 +180,7 @@ function viewToday() {
     </div>
   </section>
   <section class="mac">
-    ${macro(t.c, g.c, 'var(--org)', 'Kohlenhydrate')}${macro(t.p, g.p, 'var(--grn)', 'Eiweiß')}${macro(t.f, g.f, 'var(--blu)', 'Fett')}
+    ${macro(t.c, g.c, 'var(--org)', 'Kohlenhydrate', 'c')}${macro(t.p, g.p, 'var(--grn)', 'Eiweiß', 'p')}${macro(t.f, g.f, 'var(--blu)', 'Fett', 'f')}
   </section>
   ${weighRow()}
   ${IDEAS.length ? `<section class="list icons"><button class="it" data-act="ideas">${tile('bowl', ['#5ac8fa', '#1a8fd6'])}<div class="n"><b>Essensideen 💡</b><span>${ideasSub()}</span></div><span class="chev">${icon('right')}</span></button></section>` : ''}
@@ -569,9 +569,9 @@ function rememberFood(f) {
 }
 
 /* ---------- Menge wählen ---------- */
-function openAmount(food, { entry = null, day = null, meal = null } = {}) {
+function openAmount(food, { entry = null, day = null, meal = null, g: sugG = 0 } = {}) {
   const f = food;
-  const startG = entry ? entry.g : (f.lastG || (f.portion ? f.portion.g : 100));
+  const startG = entry ? entry.g : (sugG || f.lastG || (f.portion ? f.portion.g : 100));
   const opts = [];
   opts.push({ g: 100, l: '100 g' });
   if (f.src === 'idea' && f.portion) opts.push({ g: Math.round(f.portion.g / 2), l: '½ Gericht' }, { g: f.portion.g, l: 'Ganzes Gericht' }, { g: Math.round(f.portion.g * 1.5), l: '1½ Gerichte' });
@@ -579,6 +579,7 @@ function openAmount(food, { entry = null, day = null, meal = null } = {}) {
   if (f.src === 'base' && f.portion?.name && f.portion.name.length <= 12) opts.push({ g: f.portion.g * 2, l: `2 × ${f.portion.name}` }, { g: f.portion.g * 3, l: `3 × ${f.portion.name}` });
   if (f.pack && f.pack !== 100 && (!f.portion || f.pack !== f.portion.g)) opts.push({ g: f.pack, l: `Packung ${n0(f.pack)} g` });
   if (f.lastG && !opts.some(o => o.g === f.lastG)) opts.push({ g: f.lastG, l: `Zuletzt ${n0(f.lastG)} g` });
+  if (sugG && !opts.some(o => o.g === sugG)) opts.push({ g: sugG, l: `Vorschlag ${n0(sugG)} g` });
   openLayer('sheet', `
     <div class="sh"><div class="t"><b>${esc(f.name)}</b><span>${f.brand ? esc(f.brand) + ' · ' : ''}${n0(f.kcal)} kcal pro 100 g</span></div>
       <div class="acts">${f.id && !f.quick ? `<button class="xb star" data-act="fav" data-id="${esc(f.id)}" aria-label="Favorit">${icon(S.foods[f.id]?.fav ? 'starF' : 'star')}</button>` : ''}<button class="xb" data-act="close" aria-label="Schließen">${icon('x')}</button></div></div>
@@ -610,7 +611,7 @@ function openAmount(food, { entry = null, day = null, meal = null } = {}) {
       }
       save(); buzz(); closeTop();
       toast(entry ? 'Gespeichert' : `${n0(v.kcal)} kcal eingetragen`);
-      render(); renderAddBody(); refreshMealSheet(); refreshIdeas();
+      render(); renderAddBody(); refreshMealSheet(); refreshIdeas(); refreshMacroTips();
     });
     if (entry) $('#amtDel', el).addEventListener('click', () => deleteEntry(entry, day));
     upd();
@@ -767,6 +768,46 @@ function openRecipe(i) {
     ${i.steps.length ? `<div class="hdr"><span>Zubereitung</span></div>
     <section class="list recipe">${i.steps.map((st, k) => `<div class="it"><span class="no num">${k + 1}</span><div class="n"><span>${esc(st)}</span></div></div>`).join('')}</section>` : ''}
     <button class="btn" data-act="pickIdea" data-id="${esc(i.id)}">Zu ${esc(mealOf(ideaCtx?.meal || mealByTime()).name)} hinzufügen</button>`);
+}
+
+/* ---------- Makro-Tipps: Lebensmittel, mit denen man KH, Eiweiß oder Fett steigert ---------- */
+// [Name aus foods.js, höchstens so viele Portionen vorschlagen]
+const MACRO_TIPS = {
+  p: { name: 'Eiweiß', col: 'var(--grn)', tip: 'Am leichtesten: zu jeder Mahlzeit eine Eiweißquelle, z. B. Quark, Skyr, Eier oder Hähnchen.',
+    foods: [['Magerquark', 2], ['Skyr natur', 3], ['Hähnchenbrust gebraten', 2], ['Thunfisch im eigenen Saft', 2], ['Whey Proteinpulver', 2], ['Ei', 4], ['Hüttenkäse', 2], ['Proteinpudding', 2], ['Proteinriegel', 2], ['Lachs', 2], ['Linsen gekocht', 2], ['Putenbrust Aufschnitt', 8], ['Erdnüsse geröstet', 2], ['Milch 3,5 %', 3]] },
+  c: { name: 'Kohlenhydrate', col: 'var(--org)', tip: 'Eine Beilage mehr hilft schnell: Reis, Nudeln, Brot oder Haferflocken. Für unterwegs Banane oder Saft.',
+    foods: [['Haferflocken', 3], ['Reis gekocht', 2], ['Nudeln gekocht', 2], ['Kartoffeln gekocht', 2], ['Vollkornbrot', 4], ['Bagel', 2], ['Banane', 3], ['Tortilla Wrap', 3], ['Süßkartoffel', 2], ['Couscous gekocht', 2], ['Müsliriegel', 3], ['Datteln getrocknet', 8], ['Rosinen', 2], ['Orangensaft', 2]] },
+  f: { name: 'Fett', col: 'var(--blu)', tip: 'Gesunde Fette: Nüsse, Erdnussbutter, Avocado, Olivenöl über Salat oder Nudeln, Lachs und Käse.',
+    foods: [['Erdnussbutter', 4], ['Mandeln', 2], ['Walnüsse', 2], ['Cashewkerne', 2], ['Avocado', 2], ['Olivenöl', 3], ['Lachs', 2], ['Ei', 4], ['Gouda', 4], ['Griechischer Joghurt 10 %', 2], ['Feta', 2], ['Hummus', 2], ['Zartbitterschokolade', 2], ['Haselnüsse', 2]] },
+};
+let macroCtx = null;
+const portionTxt = (n, name) => `${n === .5 ? '½' : n % 1 ? `${Math.floor(n)}½ ×` : n === 1 ? '1' : `${n} ×`} ${name}`;
+function openMacroTips(m) {
+  macroCtx = { m, day: cur };
+  openLayer('sheet', `<div id="macroBody" style="display:flex;flex-direction:column;gap:14px"></div>`, () => { refreshMacroTips(); return () => { macroCtx = null; }; });
+}
+function refreshMacroTips() {
+  const b = $('#macroBody'); if (!b || !macroCtx) return;
+  const { m, day } = macroCtx, info = MACRO_TIPS[m], g = S.goals[m] || 0, have = totals(day)[m], need = g - have;
+  const gain = ideaGoalDefault() === 'gain';
+  const rows = info.foods.map(([name, max]) => {
+    const f = BASE['base:' + slug(name)]; if (!f || !f.portion || !f[m]) return null;
+    const per = f[m] * f.portion.g / 100;
+    // So viele Portionen, dass die Lücke zu ist (auf halbe Portionen aufgerundet), mindestens eine, höchstens max
+    const n = Math.min(max, Math.max(1, Math.ceil(Math.max(need, 0) / per * 2) / 2));
+    const grams = Math.round(n * f.portion.g), v = calc(f, grams);
+    return { f, n, grams, v, full: v[m] >= need - .5, dens: f[m] / Math.max(f.kcal, 1) };
+  }).filter(Boolean);
+  // Beim Abnehmen zuerst das, was viel davon bei wenig Kalorien liefert
+  if (!gain) rows.sort((a, c) => c.dens - a.dens);
+  const row = r => `<button class="it" data-act="macroPick" data-id="${esc(r.f.id)}" data-g="${r.grams}"><div class="n"><b>${esc(r.f.name)}</b><span>${esc(portionTxt(r.n, r.f.portion.name))} (${n0(r.grams)} g) · ${n0(r.v.kcal)} kcal</span>${r.full ? `<span class="fit ok">Reicht für dein Ziel</span>` : ''}</div><span class="k num" style="color:${info.col}">+${n0(r.v[m])} g</span><span class="plus">${icon('plus')}</span></button>`;
+  b.innerHTML = `<div class="sh"><div class="t"><b>${info.name}</b><span>${n0(have)} von ${n0(g)} g${day === todayKey() ? ' heute' : ''}</span></div><button class="xb" data-act="close" aria-label="Schließen">${icon('x')}</button></div>
+    ${need >= 1 ? `<div class="mtop"><b class="num" style="color:${info.col}">${n0(need)} g</b><span>fehlen noch bis zu deinem Ziel</span></div>
+    <p class="note" style="margin:0">${info.tip}</p>
+    <div class="hdr"><span>Damit kommst du hin</span></div>
+    <section class="list">${rows.map(row).join('')}</section>
+    <p class="foot">Antippen zum Eintragen, die Menge ist schon passend vorgeschlagen. Werte sind Richtwerte.${gain ? '' : ' Sortiert nach wenig Kalorien.'}</p>`
+    : `<div class="mtop"><b>🎉</b><span>Dein ${info.name}-Ziel für ${day === todayKey() ? 'heute' : 'diesen Tag'} ist erreicht. Stark!</span></div>`}`;
 }
 
 /* ---------- Barcode-Scanner ---------- */
@@ -1726,6 +1767,8 @@ const ACT = {
   ownFoods: () => openOwnFoods(),
   quick: () => openQuick(),
   ideas: () => openIdeas(addCtx?.meal),
+  macroTips: b => openMacroTips(b.dataset.m),
+  macroPick: b => { const f = getFood(b.dataset.id); if (f) openAmount(S.foods[f.id] ? { ...f, fav: S.foods[f.id].fav, lastG: S.foods[f.id].lastG } : f, { g: +b.dataset.g, day: macroCtx?.day || cur, meal: mealByTime() }); },
   ideaGoal: b => { S.ideaGoal = b.dataset.g; save(); refreshIdeas(); },
   ideaMeal: b => { ideaCtx.meal = b.dataset.meal; refreshIdeas(); },
   recipe: b => { const i = IDEAS.find(x => x.id === b.dataset.id); if (i) openRecipe(i); },
@@ -1985,7 +2028,7 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 
 /* ---------- Update-Hinweis ---------- */
 // Wird jedem bestehenden Nutzer einmal gezeigt. Für die nächste Neuigkeit NEWS_ID ändern und Text anpassen.
-const NEWS_ID = 'wiegen-2026-11';
+const NEWS_ID = 'makro-tipps-2026-11';
 function openNews() {
   S.seenNews = NEWS_ID; save();
   const row = (ic, g, b, t) => `<div class="it">${tile(ic, g)}<div class="n news-n"><b>${b}</b><span>${t}</span></div></div>`;
@@ -1993,16 +2036,16 @@ function openNews() {
     <div class="hello">
       <img src="icons/icon-192.png" alt="" class="hello-ic">
       <h2>Biss hat ein Update 🎉</h2>
-      <p>Neu: tägliches Wiegen mit Statistik. Deine bisherigen Gewichte sind alle mit drin.</p>
+      <p>Neu: Tipps, wie du Kohlenhydrate, Eiweiß und Fett steigerst, bis dein Ziel erreicht ist.</p>
     </div>
     <section class="list icons bklist">
-      ${row('scales', ['#40a0ff', '#0a6fe0'], 'Morgens nüchtern wiegen', 'Direkt auf „Heute“ eintragen, mit Vergleich zum Vortag.')}
-      ${row('bars', ['#4ee37a', '#24b34b'], 'Statistik', 'Wochenschnitt, Hoch und Tief und wie viel du pro Woche zu- oder abnimmst.')}
-      ${row('calendar', ['#ff5c7c', '#e8264d'], 'Tägliche Erinnerung', 'Wenn du magst, erinnert dich Biss jeden Morgen ans Wiegen.')}
+      ${row('target', ['#4ee37a', '#24b34b'], 'Auf Eiweiß, KH oder Fett tippen', 'Auf „Heute“ siehst du, wie viel noch fehlt.')}
+      ${row('fork', ['#ffb340', '#ff8a00'], 'Passende Lebensmittel', 'Mit der Menge, die du noch brauchst, und wie viel jedes davon bringt.')}
+      ${row('plus', ['#40a0ff', '#0a6fe0'], 'Mit einem Tipp eintragen', 'Die Menge ist schon vorgeschlagen.')}
     </section>
-    <button class="btn" id="nwGo">Jetzt wiegen</button>
+    <button class="btn" id="nwGo">Ausprobieren</button>
     <button class="btn del" data-act="close" style="color:var(--l2)">Später</button>`, el => {
-    $('#nwGo', el).addEventListener('click', () => { closeTop(); setTimeout(() => openWeight(), 330); });
+    $('#nwGo', el).addEventListener('click', () => { closeTop(); const t = totals(cur), g = S.goals; const m = ['p', 'c', 'f'].find(k => g[k] - t[k] >= 1) || 'p'; setTimeout(() => openMacroTips(m), 330); });
   });
   confetti();
 }

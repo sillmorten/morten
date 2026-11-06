@@ -434,3 +434,12 @@ i.o { background: var(--org); }
 .wlegend .hi { background: var(--org); }
 .wlegend .lo { background: var(--blu); }
 .xb.sure { width: auto; padding: 0 10px; border-radius: 14px; font-size: 13px; font-weight: 600; background: color-mix(in srgb, var(--red) 14%, transparent); }
+/* Makro-Kacheln antippbar, mit Rest bis zum Ziel */
+button.mc { border: 0; font: inherit; color: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: transform .15s; }
+button.mc:active { transform: scale(.96); }
+.mc .rest { font-size: 11px; font-weight: 600; color: var(--tint); }
+.mc .rest.ok { color: var(--grn); }
+.mtop { display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center; padding: 6px 0 2px; }
+.mtop b { font-size: 40px; font-weight: 800; line-height: 1.1; }
+.mtop span { color: var(--l2); font-size: 15px; }
+.it .n .fit.ok { font-size: 12px; font-weight: 600; color: var(--grn); }
