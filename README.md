@@ -1,6 +1,6 @@
 # Biss
 
-Aktuelle Version: 1.22.0
+Aktuelle Version: 1.23.0
 
 Kalorien- und Makro-Tracker fürs iPhone, ohne Abo, ohne Konto, ohne Werbung.
 Alle Daten bleiben lokal auf dem Gerät (localStorage). Lebensmittel kommen von
@@ -19,7 +19,7 @@ Alle Daten bleiben lokal auf dem Gerät (localStorage). Lebensmittel kommen von
 - Körpermaße mit Verlauf und Fortschrittsfotos (verkleinert in IndexedDB, im Backup enthalten)
 - Supplement-Tracker zum täglichen Abhaken, frei einstellbar
 - Makro-Tipps: Antippen von Kohlenhydrate, Eiweiß oder Fett auf „Heute“ zeigt, wie viel noch fehlt, und passende Lebensmittel mit vorgeschlagener Menge zum direkten Eintragen
-- Essensideen zum Abnehmen oder Zunehmen (`ideas.js`), sortiert nach den übrigen Kalorien und dem Eiweiß des Tages, mit einem Tipp eintragbar
+- Essensideen zum Abnehmen oder Zunehmen (`ideas.js`), sortiert nach den übrigen Kalorien und dem Eiweiß des Tages, mit einem Tipp eintragbar; einzelne Zutaten lassen sich im Rezept abwählen (z. B. ohne Banane), die Werte werden neu berechnet
 - Verbesserungswünsche direkt aus der App an den Entwickler senden (Formspree)
 
 ## Installation auf dem iPhone
