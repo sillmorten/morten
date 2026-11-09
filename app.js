@@ -33,7 +33,7 @@ const WISH_URL = 'https://formspree.io/f/xeepbyjn';
 const STATS_URL = 'https://wfrtltqzhmeaildtlxga.supabase.co';
 const STATS_KEY = 'sb_publishable_Ic-sGCsYX6A3977v6kDEQA_i0W63MOG';
 // Versionsnummer für die Anzeige in der App. Bei jedem Update zusammen mit VERSION in sw.js hochzählen.
-const APP_VERSION = '1.26.0';
+const APP_VERSION = '1.26.1';
 const KEY = 'kalorien.v1';
 const DEFAULTS = () => ({
   v: 1, setup: false, name: '', greeted: false, goals: { kcal: 2500, c: 280, p: 150, f: 80 }, weightKg: 80, days: {}, foods: {}, weights: [], weighRem: 0, weighSkip: '', lastBackup: null, bkRemind: 7, bkSnooze: 0,
