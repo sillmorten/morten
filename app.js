@@ -33,7 +33,7 @@ const WISH_URL = 'https://formspree.io/f/xeepbyjn';
 const STATS_URL = 'https://wfrtltqzhmeaildtlxga.supabase.co';
 const STATS_KEY = 'sb_publishable_Ic-sGCsYX6A3977v6kDEQA_i0W63MOG';
 // Versionsnummer für die Anzeige in der App. Bei jedem Update zusammen mit VERSION in sw.js hochzählen.
-const APP_VERSION = '1.23.1';
+const APP_VERSION = '1.24.0';
 const KEY = 'kalorien.v1';
 const DEFAULTS = () => ({
   v: 1, setup: false, name: '', greeted: false, goals: { kcal: 2500, c: 280, p: 150, f: 80 }, weightKg: 80, days: {}, foods: {}, weights: [], weighRem: 0, weighSkip: '', lastBackup: null, bkRemind: 7, bkSnooze: 0,
@@ -725,15 +725,19 @@ function buildIdea(emoji, name, meals, goal, parts, base = name) {
     portion: { g, label: `Ganzes Gericht (${n0(g)} g)` }, ingr: items.map(x => `${x.f.name} ${n0(x.g)}\u00a0g`).join(' · '), parts: items.map(x => [x.f.name, x.g]), min, steps };
 }
 // Rezept ohne die abgewählten Zutaten, z. B. „Masse-Shake (ohne Banane)“, mit neu berechneten Werten
-function ideaVariant(i, off) {
-  if (!off.size) return i;
-  const keep = i.parts.filter((_, k) => !off.has(k)), gone = i.parts.filter((_, k) => off.has(k)).map(([n]) => n);
+function ideaVariant(i, off, gs = i.parts.map(([, g]) => g)) {
+  const parts = i.parts.map(([n], k) => [n, off.has(k) ? 0 : Math.round(gs[k] || 0)]);
+  const keep = parts.filter(([, g]) => g > 0);
   if (!keep.length) return null;
-  return buildIdea(i.emoji, `${i.name} (ohne ${gone.join(', ')})`, i.meals, i.goal, keep, i.name);
+  const gone = parts.filter(([, g]) => !g).map(([n]) => n);
+  const changed = parts.filter(([, g], k) => g > 0 && g !== i.parts[k][1]).map(([n, g]) => `${n} ${n0(g)}\u00a0g`);
+  if (!gone.length && !changed.length) return i;
+  const suffix = [gone.length ? `ohne ${gone.join(', ')}` : '', ...changed].filter(Boolean).join(', ');
+  return buildIdea(i.emoji, `${i.name} (${suffix})`, i.meals, i.goal, keep, i.name);
 }
 let recipeCtx = null;
 // Grundrezept zu einer Essensidee, auch zu einer gespeicherten Variante „… (ohne …)“
-const ideaBase = f => f && f.src === 'idea' ? IDEAS.find(x => x.id === f.id || f.name.startsWith(x.name + ' (ohne ')) : null;
+const ideaBase = f => f && f.src === 'idea' ? IDEAS.find(x => x.id === f.id || f.name.startsWith(x.name + ' (')) : null;
 const MEAL_SHARE = { b: .25, l: .35, d: .3, s: .12 };
 let ideaCtx = null;
 function ideaGoalDefault() {
@@ -770,23 +774,44 @@ function refreshIdeas() {
     <p class="foot">Die Werte sind aus den eingebauten Lebensmitteln berechnet und damit Richtwerte.</p>`;
 }
 
-function openRecipe(i, off = new Set()) {
-  recipeCtx = { i, off };
+function openRecipe(i, off = new Set(), gs = i.parts.map(([, g]) => g)) {
+  recipeCtx = { i, off, gs };
   openLayer('sheet', `<div id="recipeBody" style="display:flex;flex-direction:column;gap:14px"></div>`, () => { refreshRecipe(); return () => { recipeCtx = null; }; });
 }
 function refreshRecipe() {
   const b = $('#recipeBody'); if (!b || !recipeCtx) return;
-  const { i, off } = recipeCtx, v = ideaVariant(i, off), t = v ? v.total : { kcal: 0, c: 0, p: 0, f: 0 };
-  recipeCtx.v = v;
+  const { i, off, gs } = recipeCtx;
   b.innerHTML = `
-    <div class="sh"><div class="t"><b>${i.emoji} ${esc(i.name)}</b><span>${i.min ? `⏱ ${i.min} Minuten · ` : ''}1 Portion${off.size ? ` · ohne ${esc(i.parts.filter((_, k) => off.has(k)).map(([n]) => n).join(', '))}` : ''}</span></div><button class="xb" data-act="close" aria-label="Schließen">${icon('x')}</button></div>
-    <div class="nut"><div><b class="num">${n0(t.kcal)}</b><span>kcal</span></div><div><b class="num" style="color:var(--org)">${n0(t.c)} g</b><span>KH</span></div><div><b class="num" style="color:var(--grn)">${n0(t.p)} g</b><span>Eiweiß</span></div><div><b class="num" style="color:var(--blu)">${n0(t.f)} g</b><span>Fett</span></div></div>
-    <div class="hdr"><span>Zutaten</span>${off.size ? `<button data-act="recipeAll">Alle wieder rein</button>` : ''}</div>
-    <section class="list ingr">${i.parts.map(([n, g], k) => { const on = !off.has(k); return `<button class="it${on ? '' : ' off'}" data-act="recipeToggle" data-k="${k}" aria-pressed="${on}"><span class="chk${on ? ' on' : ''}">${icon('check')}</span><div class="n"><b>${esc(n)}</b></div><span class="k num">${n0(g)} g</span></button>`; }).join('')}</section>
-    <p class="foot" style="margin-top:-6px">${i.parts.length > 1 ? 'Hast du etwas nicht da? Antippen zum Weglassen, die Werte werden neu berechnet.' : ''}</p>
+    <div class="sh"><div class="t"><b>${i.emoji} ${esc(i.name)}</b><span id="rcSub"></span></div><button class="xb" data-act="close" aria-label="Schließen">${icon('x')}</button></div>
+    <div class="nut" id="rcNut"></div>
+    <div class="hdr"><span>Zutaten</span><button data-act="recipeAll" id="rcAll">Wie im Rezept</button></div>
+    <section class="list ingr">${i.parts.map(([n], k) => `<div class="it" data-k="${k}"><button class="chk" data-act="recipeToggle" data-k="${k}" aria-label="${esc(n)} weglassen oder nehmen">${icon('check')}</button><div class="n"><b>${esc(n)}</b></div><label class="ig"><input inputmode="decimal" data-k="${k}" value="${n0(gs[k])}" aria-label="${esc(n)} in Gramm"><span>g</span></label></div>`).join('')}</section>
+    <p class="foot" style="margin-top:-6px">Hast du etwas nicht da, tippe auf den Haken. Hast du weniger oder mehr, trag die Gramm ein. Die Werte werden neu berechnet.</p>
     ${i.steps.length ? `<div class="hdr"><span>Zubereitung</span></div>
     <section class="list recipe">${i.steps.map((st, k) => `<div class="it"><span class="no num">${k + 1}</span><div class="n"><span>${esc(st)}</span></div></div>`).join('')}</section>` : ''}
-    <button class="btn" data-act="pickIdea" data-id="${esc(v ? v.id : i.id)}" ${v ? '' : 'disabled'}>${v ? `Zu ${esc(mealOf(ideaCtx?.meal || addCtx?.meal || mealByTime()).name)} hinzufügen` : 'Mindestens eine Zutat auswählen'}</button>`;
+    <button class="btn" data-act="pickIdea" id="rcOk"></button>`;
+  b.querySelectorAll('.ig input').forEach(inp => {
+    inp.addEventListener('focus', () => inp.select());
+    inp.addEventListener('input', () => { const k = +inp.dataset.k, g = num(inp.value); gs[k] = isNaN(g) ? 0 : Math.max(0, g); if (gs[k] > 0) off.delete(k); updRecipe(); });
+  });
+  updRecipe();
+}
+// Nur Zahlen und Zustände aktualisieren, damit das Eingabefeld beim Tippen den Fokus behält
+function updRecipe() {
+  const b = $('#recipeBody'); if (!b || !recipeCtx) return;
+  const { i, off, gs } = recipeCtx, v = ideaVariant(i, off, gs), t = v ? v.total : { kcal: 0, c: 0, p: 0, f: 0 };
+  recipeCtx.v = v;
+  const sub = v && v !== i ? v.name.slice(i.name.length + 2, -1) : '';
+  $('#rcSub', b).textContent = `${i.min ? `⏱ ${i.min} Minuten · ` : ''}1 Portion${sub ? ' · ' + sub : ''}`;
+  $('#rcNut', b).innerHTML = `<div><b class="num">${n0(t.kcal)}</b><span>kcal</span></div><div><b class="num" style="color:var(--org)">${n0(t.c)} g</b><span>KH</span></div><div><b class="num" style="color:var(--grn)">${n0(t.p)} g</b><span>Eiweiß</span></div><div><b class="num" style="color:var(--blu)">${n0(t.f)} g</b><span>Fett</span></div>`;
+  $('#rcAll', b).style.visibility = v === i ? 'hidden' : 'visible';
+  b.querySelectorAll('.list.ingr .it').forEach(row => {
+    const k = +row.dataset.k, on = !off.has(k) && gs[k] > 0;
+    row.classList.toggle('off', !on); $('.chk', row).classList.toggle('on', on); $('.chk', row).setAttribute('aria-pressed', on);
+  });
+  const ok = $('#rcOk', b);
+  ok.disabled = !v; ok.dataset.id = v ? v.id : i.id;
+  ok.textContent = v ? `Zu ${mealOf(ideaCtx?.meal || addCtx?.meal || mealByTime()).name} hinzufügen` : 'Mindestens eine Zutat auswählen';
 }
 
 /* ---------- Makro-Tipps: Lebensmittel, mit denen man KH, Eiweiß oder Fett steigert ---------- */
@@ -1791,15 +1816,20 @@ const ACT = {
   ideaGoal: b => { S.ideaGoal = b.dataset.g; save(); refreshIdeas(); },
   ideaMeal: b => { ideaCtx.meal = b.dataset.meal; refreshIdeas(); },
   recipe: b => { const i = IDEAS.find(x => x.id === b.dataset.id); if (i) openRecipe(i); },
-  recipeToggle: b => { if (!recipeCtx) return; const k = +b.dataset.k, o = recipeCtx.off; o.has(k) ? o.delete(k) : o.add(k); buzz(); refreshRecipe(); },
-  recipeAll: () => { if (recipeCtx) { recipeCtx.off.clear(); refreshRecipe(); } },
+  recipeToggle: b => {
+    if (!recipeCtx) return; const k = +b.dataset.k, { off, gs, i } = recipeCtx;
+    if (off.has(k) || !(gs[k] > 0)) { off.delete(k); if (!(gs[k] > 0)) { gs[k] = i.parts[k][1]; const inp = $(`#recipeBody .ig input[data-k="${k}"]`); if (inp) inp.value = n0(gs[k]); } } else off.add(k);
+    buzz(); updRecipe();
+  },
+  recipeAll: () => { if (recipeCtx) { recipeCtx.off.clear(); recipeCtx.gs = recipeCtx.i.parts.map(([, g]) => g); refreshRecipe(); } },
   pickIdea: b => { const f = recipeCtx?.v?.id === b.dataset.id ? recipeCtx.v : getFood(b.dataset.id); if (f) openAmount(S.foods[f.id] ? { ...f, fav: S.foods[f.id].fav, lastG: S.foods[f.id].lastG } : f, { meal: ideaCtx?.meal || addCtx?.meal || mealByTime(), day: ideaCtx?.day || addCtx?.day || cur }); },
   ideaEdit: b => {
     const f = getFood(b.dataset.id), base = ideaBase(f); if (!base) return;
-    // Bei einer Variante sind die fehlenden Zutaten schon abgewählt
-    const have = new Set((f.parts || base.parts).map(([n]) => n));
+    // Bei einer Variante sind die fehlenden Zutaten schon abgewählt und die Gramm übernommen
+    const have = new Map((f.parts || base.parts).map(([n, g]) => [n, g]));
     const off = new Set(base.parts.map(([n], k) => have.has(n) ? -1 : k).filter(k => k >= 0));
-    closeTop(); setTimeout(() => openRecipe(base, off), 330);
+    const gs = base.parts.map(([n, g]) => have.get(n) || g);
+    closeTop(); setTimeout(() => openRecipe(base, off, gs), 330);
   },
   editEntry: b => {
     const e = getDay(mealSheet.day).food.find(x => x.id === b.dataset.id); if (!e) return;
