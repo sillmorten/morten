@@ -448,3 +448,9 @@ button.mc:active { transform: scale(.96); }
 .list.ingr .it.off .n b, .list.ingr .it.off .k { color: var(--l3); text-decoration: line-through; }
 .linkbtn { display: flex; align-items: center; gap: 8px; justify-content: center; border: 0; background: var(--sheetcard); color: var(--tint); font: inherit; font-size: 15px; font-weight: 600; border-radius: 14px; padding: 12px 14px; cursor: pointer; flex: none; }
 .linkbtn .i { font-size: 18px; }
+.list.ingr .chk { padding: 0; background: transparent; cursor: pointer; }
+.list.ingr .chk.on { background: var(--grn); }
+.list.ingr .ig { display: flex; align-items: center; gap: 4px; background: color-mix(in srgb, var(--l3) 22%, transparent); border-radius: 10px; padding: 6px 10px; flex: none; }
+.list.ingr .ig input { width: 3.2em; border: 0; background: transparent; font: inherit; font-size: 16px; font-weight: 600; text-align: right; color: var(--l1); outline: none; padding: 0; }
+.list.ingr .ig span { color: var(--l2); font-size: 15px; }
+.list.ingr .it.off .ig input { color: var(--l3); }
