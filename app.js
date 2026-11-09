@@ -33,7 +33,7 @@ const WISH_URL = 'https://formspree.io/f/xeepbyjn';
 const STATS_URL = 'https://wfrtltqzhmeaildtlxga.supabase.co';
 const STATS_KEY = 'sb_publishable_Ic-sGCsYX6A3977v6kDEQA_i0W63MOG';
 // Versionsnummer für die Anzeige in der App. Bei jedem Update zusammen mit VERSION in sw.js hochzählen.
-const APP_VERSION = '1.27.1';
+const APP_VERSION = '1.28.0';
 const KEY = 'kalorien.v1';
 const DEFAULTS = () => ({
   v: 1, setup: false, name: '', greeted: false, goals: { kcal: 2500, c: 280, p: 150, f: 80 }, weightKg: 80, days: {}, foods: {}, weights: [], weighRem: 0, weighSkip: '', lastBackup: null, bkRemind: 7, bkSnooze: 0,
@@ -168,7 +168,7 @@ function viewToday() {
   </header>
   <h1 class="lt" data-act="calendar"><small>${longDate(cur)}${kdate(cur).getFullYear() !== new Date().getFullYear() ? ' ' + kdate(cur).getFullYear() : ''}</small>${dayTitle(cur)}</h1>
   ${isToday && S.name ? `<p class="greet">${greeting()}${isPro() ? ' <span class="pro-tag">PRO</span>' : ''}</p>` : ''}
-  ${isToday ? streakPill() : ''}
+  ${isToday && isPro() ? streakPill() : ''}
   ${weighDue() ? weighBanner() : isToday && backupDue() ? backupBanner() : ''}
   <section class="card hero">
     <div class="ringwrap">${ring(over ? 1 : (avail ? t.kcal / avail : 0), over ? 'var(--org)' : 'var(--tint)', { size: 140, stroke: 18 })}
@@ -184,7 +184,7 @@ function viewToday() {
   </section>
   ${weighRow()}
   ${adBanner(0)}
-  ${IDEAS.length ? `<section class="list icons"><button class="it" data-act="ideas">${tile('bowl', ['#5ac8fa', '#1a8fd6'])}<div class="n"><b>Essensideen 💡</b><span>${ideasSub()}</span></div><span class="chev">${icon('right')}</span></button></section>` : ''}
+  ${IDEAS.length ? `<section class="list icons"><button class="it" data-act="ideas">${tile('bowl', ['#5ac8fa', '#1a8fd6'])}<div class="n"><b>Essensideen 💡${proTag()}</b><span>${isPro() ? ideasSub() : 'Rezepte und Gerichte mit Biss Pro'}</span></div><span class="chev">${icon('right')}</span></button></section>` : ''}
   <div class="hdr"><span>Mahlzeiten</span></div>
   <section class="list icons">
     ${meals}
@@ -280,7 +280,7 @@ function viewHistory() {
     <div class="it"><span class="ic" style="background:linear-gradient(180deg,#ffb340,#ff8a00)">${icon('bolt')}</span><div class="n"><b>Makros im Schnitt</b><span>${base.length ? `${n0(avg('c'))} g KH · ${n0(pAvg)} g Eiweiß · ${n0(avg('f'))} g Fett` : 'Keine Daten in diesem Zeitraum'}</span></div></div>
     <button class="it" data-act="weight">${tile('scales', ['#40a0ff', '#0a6fe0'])}<div class="n"><b>Körpergewicht</b><span>${lastW ? `${n1(lastW.kg)} kg${wPace !== null ? ` · ${signKg(wPace)} pro Woche` : wDiff !== null ? ` · ${signKg(wDiff)} in 30 Tagen` : ''}` : 'Morgens nüchtern wiegen'}</span></div><span class="chev">${icon('right')}</span></button>
     <button class="it" data-act="body">${tile('ruler', ['#5ac8fa', '#1a9bd7'])}<div class="n"><b>Körpermaße & Fotos</b><span>${bodySub()}</span></div><span class="chev">${icon('right')}</span></button>
-    <button class="it" data-act="badges">${tile('trophy', ['#ffd60a', '#f5a300'])}<div class="n"><b>Streaks & Abzeichen</b><span>${earnedCount()} von ${BADGES.length} Abzeichen</span></div><span class="chev">${icon('right')}</span></button>
+    <button class="it" data-act="badges">${tile('trophy', ['#ffd60a', '#f5a300'])}<div class="n"><b>Streaks & Abzeichen${proTag()}</b><span>${isPro() ? `${earnedCount()} von ${BADGES.length} Abzeichen` : 'Mit Biss Pro'}</span></div><span class="chev">${icon('right')}</span></button>
     <button class="it" data-act="backup">${tile('cloud', backupAge !== null && backupAge < 30 || !hasAny ? ['#a1a1a6', '#6e6e73'] : ['#ffb340', '#ff8a00'])}<div class="n"><b>Backup</b><span>${backupSub}</span></div><span class="chev">${icon('right')}</span></button>
   </section>
   ${adBanner(1)}
@@ -508,7 +508,7 @@ function renderAddBody() {
     } else html += list.length ? `<section class="list">${list.map(f => foodRow(f)).join('')}</section>` : `<p class="empty">${empty}</p>`;
   }
   html += `<section class="list icons">
-    ${IDEAS.length ? `<button class="it" data-act="ideas">${tile('bowl', ['#5ac8fa', '#1a8fd6'])}<div class="n"><b>Essensideen 💡</b><span>Gerichte zum Abnehmen oder Zunehmen</span></div><span class="chev">${icon('right')}</span></button>` : ''}
+    ${IDEAS.length ? `<button class="it" data-act="ideas">${tile('bowl', ['#5ac8fa', '#1a8fd6'])}<div class="n"><b>Essensideen 💡${proTag()}</b><span>Gerichte zum Abnehmen oder Zunehmen</span></div><span class="chev">${icon('right')}</span></button>` : ''}
     <button class="it" data-act="newFood">${tile('pencil', ['#a1a1a6', '#6e6e73'])}<div class="n"><b>Eigenes Lebensmittel anlegen</b><span>Werte von der Packung abtippen</span></div><span class="chev">${icon('right')}</span></button>
     <button class="it" data-act="quick">${tile('bolt', ['#ffb340', '#ff8a00'])}<div class="n"><b>Schnell eintragen</b><span>Nur Kalorien, z. B. beim Essen auswärts</span></div><span class="chev">${icon('right')}</span></button>
   </section>`;
@@ -1245,7 +1245,7 @@ function checkBadges() {
   if (!fresh.length) return;
   const t = todayKey(); fresh.forEach(b => { S.badges[b.id] = t; });
   try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {}
-  toast(`Neues Abzeichen: ${fresh[0].e} ${fresh[0].n}`); buzz(); confetti();
+  if (isPro()) { toast(`Neues Abzeichen: ${fresh[0].e} ${fresh[0].n}`); buzz(); confetti(); }
   render();
 }
 function openBadges() {
@@ -1399,13 +1399,13 @@ function drawBody() {
     <div class="nav"><button class="navbtn" data-act="close">${icon('left')}Verlauf</button></div>
     <h1 class="lt">Körper</h1>
     <div class="hdr"><span>Fortschrittsfotos</span></div>
-    ${ph.length >= 2 ? `<section class="card cmp">
+    ${!isPro() ? `<section class="list icons"><button class="it" data-act="proLock" data-f="photos">${tile('camera', ['#ff6b8a', '#e3123f'])}<div class="n"><b>Fortschrittsfotos${proTag()}</b><span>${ph.length ? `${ph.length} gespeichert, sichtbar mit Biss Pro` : 'Vorher und nachher vergleichen'}</span></div><span class="chev">${icon('right')}</span></button></section>` : `${ph.length >= 2 ? `<section class="card cmp">
       <figure><img data-ph="${first.id}" alt="" data-act="photo" data-id="${first.id}"><figcaption>Vorher · ${shortDate(first.date)}</figcaption></figure>
       <figure><img data-ph="${last.id}" alt="" data-act="photo" data-id="${last.id}"><figcaption>Jetzt · ${shortDate(last.date)}</figcaption></figure>
       ${days > 0 ? `<p>${days} ${days === 1 ? 'Tag' : 'Tage'} Unterschied</p>` : ''}</section>` : ''}
     ${ph.length ? `<div class="phgrid">${ph.slice().reverse().map(p => `<button data-act="photo" data-id="${p.id}"><img data-ph="${p.id}" alt="Foto vom ${shortDate(p.date)}"><span>${shortDate(p.date).slice(4)}</span></button>`).join('')}</div>` : `<section class="list"><p class="empty">Mach alle paar Wochen ein Foto, gleiche Pose, gleiches Licht. So siehst du Fortschritte, die die Waage nicht zeigt.</p></section>`}
     <button class="btn sec iconbtn" data-act="addPhoto">${icon('camera')}Foto hinzufügen</button>
-    <p class="foot">Fotos bleiben nur auf diesem iPhone. Sie werden verkleinert gespeichert und sind im Backup enthalten.</p>
+    <p class="foot">Fotos bleiben nur auf diesem iPhone. Sie werden verkleinert gespeichert und sind im Backup enthalten.</p>`}
     <div class="hdr"><span>Körpermaße</span></div>
     ${avail.length ? `<section class="list">${avail.map(m => { const s = series(m.id), l = s[s.length - 1]; return `<button class="it${m.id === bodyMeasure ? ' sel' : ''}" data-act="bodyMeasure" data-m="${m.id}"><div class="n"><b>${m.name}</b><span>${shortDate(l.date)}${diff(s, m)}</span></div><span class="k num">${n1(l[m.id])} ${m.unit}</span></button>`; }).join('')}</section>
     ${sel.length >= 2 ? `${rangeSeg(bRange, 'data-act="bodyRange" data-r')}<section class="card wchart"><div class="ctop">${selM.name}</div>${sinceDays(sel, bRange).length >= 2 ? weightChart(sinceDays(sel, bRange), bodyMeasure, 'var(--tint)') : '<p class="empty">Zu wenige Einträge in diesem Zeitraum.</p>'}</section>` : ''}` : ''}
@@ -1813,8 +1813,8 @@ const ACT = {
   editFood: b => { const f = S.foods[b.dataset.id]; if (f) openFoodForm({ food: f }); },
   ownFoods: () => openOwnFoods(),
   quick: () => openQuick(),
-  ideas: () => openIdeas(addCtx?.meal),
-  macroTips: b => openMacroTips(b.dataset.m),
+  ideas: () => { if (!needPro('ideas')) openIdeas(addCtx?.meal); },
+  macroTips: b => { if (!needPro('macroTips')) openMacroTips(b.dataset.m); },
   macroPick: b => { const f = getFood(b.dataset.id); if (f) openAmount(S.foods[f.id] ? { ...f, fav: S.foods[f.id].fav, lastG: S.foods[f.id].lastG } : f, { g: +b.dataset.g, day: macroCtx?.day || cur, meal: mealByTime() }); },
   ideaGoal: b => { S.ideaGoal = b.dataset.g; save(); refreshIdeas(); },
   ideaMeal: b => { ideaCtx.meal = b.dataset.meal; refreshIdeas(); },
@@ -1843,12 +1843,13 @@ const ACT = {
   weight: b => openWeight(b.dataset.k || todayKey()),
   weighSkip: () => { S.weighSkip = todayKey(); save(); render(); toast('Heute keine Erinnerung mehr'); },
   body: () => openBody(),
-  badges: () => openBadges(),
+  badges: () => { if (!needPro('badges')) openBadges(); },
+  proLock: b => needPro(b.dataset.f),
   supps: () => openSupps(),
   calc: () => openCalc(),
   wish: () => openWish(),
   photo: b => openPhoto(b.dataset.id),
-  addPhoto: () => { const f = bodyEl && $('#phFile', bodyEl); if (f) f.click(); },
+  addPhoto: () => { if (needPro('photos')) return; const f = bodyEl && $('#phFile', bodyEl); if (f) f.click(); },
   measure: () => openMeasure(),
   bodyMeasure: b => { bodyMeasure = b.dataset.m; drawBody(); },
   bodyRange: b => { bRange = +b.dataset.r; drawBody(); },
@@ -2184,10 +2185,33 @@ function showInterstitial() {
   x.addEventListener('click', close);
   el.closeAd = close;
 }
+// Diese Funktionen gibt es nur mit Pro. Ohne Pro trägt man alles selbst ein.
+const PRO_FEATURES = {
+  ideas: ['bowl', ['#5ac8fa', '#1a8fd6'], 'Essensideen und Rezepte', 'Passende Gerichte mit einem Tipp eintragen.'],
+  macroTips: ['target', ['#4ee37a', '#24b34b'], 'Makro-Tipps', 'Was dir an Eiweiß, KH und Fett fehlt, mit passenden Lebensmitteln.'],
+  badges: ['trophy', ['#ffd60a', '#f5a300'], 'Streaks und Abzeichen', 'Sammle Abzeichen für deine Erfolge.'],
+  photos: ['camera', ['#ff6b8a', '#e3123f'], 'Fortschrittsfotos', 'Vorher und nachher direkt vergleichen.'],
+};
+const proTag = () => isPro() ? '' : '<span class="pro-tag sm">PRO</span>';
+function needPro(f) {
+  if (isPro()) return false;
+  const [ic, g, name, txt] = PRO_FEATURES[f];
+  openLayer('sheet', `
+    <div class="sh"><div class="t"></div><button class="xb" data-act="close" aria-label="Schließen">${icon('x')}</button></div>
+    <div class="hello pro-hello">
+      <span class="pro-crown">${CROWN}</span>
+      <h2>${name}</h2>
+      <p>${txt} Das gibt es mit Biss Pro.</p>
+    </div>
+    <button class="btn pro-buy" id="plGo">${CROWN}Biss Pro ansehen</button>`, el => {
+    $('#plGo', el).addEventListener('click', () => { closeTop(); setTimeout(openPro, 330); });
+  });
+  return true;
+}
 const CROWN = `<svg class="i" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M32 72l52 52 44-68 44 68 52-52-20 120H52z"/><rect x="52" y="204" width="152" height="20" rx="6"/></svg>`;
 function proSub() {
   const p = proState();
-  return p && p.on ? `Aktiv seit ${new Date(p.since).toLocaleDateString('de-DE')}` : 'Ohne Werbung, eigene App-Farbe';
+  return p && p.on ? `Aktiv seit ${new Date(p.since).toLocaleDateString('de-DE')}` : 'Ohne Werbung, mit Rezepten, Abzeichen und Fotos';
 }
 function openPro() {
   const pro = isPro(), p = proState() || {}, col = p.color || PRO_COLORS[0][0];
@@ -2201,6 +2225,10 @@ function openPro() {
     </div>
     <section class="list icons bklist">
       ${row('x', ['#ff6b8a', '#e3123f'], 'Keine Werbung', 'Weder Banner noch Vollbild-Anzeigen.')}
+      ${row('bowl', ['#5ac8fa', '#1a8fd6'], 'Essensideen und Rezepte', 'Passende Gerichte mit einem Tipp eintragen.')}
+      ${row('target', ['#4ee37a', '#24b34b'], 'Makro-Tipps', 'Was dir fehlt, mit passenden Lebensmitteln.')}
+      ${row('trophy', ['#ffd60a', '#f5a300'], 'Streaks und Abzeichen', 'Für deine Erfolge.')}
+      ${row('camera', ['#ff6b8a', '#e3123f'], 'Fortschrittsfotos', 'Vorher und nachher vergleichen.')}
       ${row('sparkle', ['#c77dff', '#9b4dde'], 'Eigene App-Farbe', 'Pink, Blau, Grün, Orange, Lila oder Türkis.')}
       ${row('heart', ['#4ee37a', '#24b34b'], 'Entwickler unterstützen', 'Hilft, Biss weiter zu verbessern.')}
     </section>
@@ -2248,7 +2276,7 @@ applyProColor();
 
 /* ---------- Update-Hinweis ---------- */
 // Wird jedem bestehenden Nutzer einmal gezeigt. Für die nächste Neuigkeit NEWS_ID ändern und Text anpassen.
-const NEWS_ID = 'pro-demo-2026-11';
+const NEWS_ID = 'pro-funktionen-2026-11';
 function openNews() {
   S.seenNews = NEWS_ID; save();
   const row = (ic, g, b, t) => `<div class="it">${tile(ic, g)}<div class="n news-n"><b>${b}</b><span>${t}</span></div></div>`;
@@ -2260,7 +2288,7 @@ function openNews() {
     </div>
     <section class="list icons bklist">
       ${row('info', ['#a1a1a6', '#6e6e73'], 'Demo-Werbung', 'Ausgedachte Anzeigen auf „Heute“, im Verlauf und alle 20 Minuten im Vollbild.')}
-      ${row('sparkle', ['#ffd60a', '#f5a300'], 'Biss Pro', 'Ohne Werbung und mit eigener App-Farbe. Unter „Ziele“ testweise freischalten.')}
+      ${row('sparkle', ['#ffd60a', '#f5a300'], 'Biss Pro', 'Ohne Werbung, mit Essensideen, Makro-Tipps, Abzeichen, Fotos und eigener App-Farbe. Ohne Pro trägst du alles selbst ein.')}
     </section>
     <button class="btn" id="nwGo">Biss Pro ansehen</button>
     <button class="btn del" data-act="close" style="color:var(--l2)">Später</button>`, el => {
