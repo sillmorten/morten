@@ -2037,7 +2037,7 @@ function showLock(st) {
       if (Date.now() < admWait) { err.textContent = `Zu viele Versuche. Bitte ${Math.ceil((admWait - Date.now()) / 1000)} Sekunden warten.`; return; }
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(mail.value.trim())) return fail('Bitte eine gültige E-Mail-Adresse eingeben.', mail);
       if (!pw.value) return fail('Bitte das Passwort eingeben.', pw);
-      if (await sha256(pw.value.trim()) === ADMIN_HASH) { admFails = 0; pw.blur(); unlockOwner(el, 'Willkommen zurück'); return; }
+      if (await sha256(mail.value.trim().toLowerCase()) === ADMIN_MAIL_HASH && await sha256(pw.value.trim()) === ADMIN_HASH) { admFails = 0; pw.blur(); unlockOwner(el, 'Willkommen zurück'); return; }
       if (++admFails >= 5) { admWait = Date.now() + 30000; admFails = 0; }
       fail('E-Mail oder Passwort ist falsch.', pw);
     });
@@ -2076,6 +2076,7 @@ function unlockOwner(el, msg) {
 }
 // Admin-Login: Passwort wird nur als SHA-256-Prüfsumme verglichen (kein echter Schutz, die App läuft komplett im Browser)
 const ADMIN_HASH = '73887ad2ebd766a3876b21123636213a62ffd820ab061a7b5a5c6180c693305b';
+const ADMIN_MAIL_HASH = 'ca17cb1657db2f847ec996f23754a38a9788afeea8b229799598b0103a322773'; // nur Hashes, keine Klartext-Zugangsdaten im Code
 async function sha256(t) { const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(t)); return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, '0')).join(''); }
 let admFails = 0, admWait = 0;
 function showAdminLogin(el, st) {
