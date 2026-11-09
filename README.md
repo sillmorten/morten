@@ -7,6 +7,7 @@ Alle Daten bleiben lokal auf dem Gerät (localStorage). Lebensmittel kommen von
 [Open Food Facts](https://world.openfoodfacts.org) (ODbL).
 
 ## Funktionen
+- Glas-Optik (ab 1.29): ruhiger Farbverlauf im Hintergrund, durchscheinende, unscharfe Karten mit feinem hellen Rand, getönte Symbol-Kacheln; bei „Transparenz reduzieren“ in iOS deckende Flächen
 - Tagesübersicht: gegessen, verbrannt, übrig, Kohlenhydrate, Eiweiß, Fett
 - Ziel-Rechner: Kalorien und Makros aus Alter, Größe, Gewicht, Zielgewicht und Aktivität (Mifflin-St Jeor), mit Zieldatum
 - Über 180 eingebaute Alltags-Lebensmittel mit Portionsgrößen (funktionieren offline)
