@@ -33,7 +33,7 @@ const WISH_URL = 'https://formspree.io/f/xeepbyjn';
 const STATS_URL = 'https://wfrtltqzhmeaildtlxga.supabase.co';
 const STATS_KEY = 'sb_publishable_Ic-sGCsYX6A3977v6kDEQA_i0W63MOG';
 // Versionsnummer für die Anzeige in der App. Bei jedem Update zusammen mit VERSION in sw.js hochzählen.
-const APP_VERSION = '1.25.0';
+const APP_VERSION = '1.26.0';
 const KEY = 'kalorien.v1';
 const DEFAULTS = () => ({
   v: 1, setup: false, name: '', greeted: false, goals: { kcal: 2500, c: 280, p: 150, f: 80 }, weightKg: 80, days: {}, foods: {}, weights: [], weighRem: 0, weighSkip: '', lastBackup: null, bkRemind: 7, bkSnooze: 0,
@@ -2016,15 +2016,30 @@ function showLock(st) {
   // Schlichte Variante: nur Logo und ein Satz, am Rand ein wandernder RGB-Neonverlauf ("stil": "neon" in status.json)
   if (st.stil === 'neon') {
     clearInterval(lockTick);
-    el.innerHTML = `<video class="nx-vid" src="media/gym.mp4" poster="media/gym.jpg" autoplay muted loop playsinline disablepictureinpicture preload="auto" aria-hidden="true"></video><i class="nx-dim" aria-hidden="true"></i><i class="nb" aria-hidden="true"></i><i class="ng" aria-hidden="true"><i></i></i>
-      <div class="mx"><button class="nx-logo mx-in" id="lockBadge" aria-label="Biss"><img src="icons/icon-192.png" alt=""></button>
-      <p class="nx-txt mx-in" style="animation-delay:.3s">${esc(st.text || 'Nach einem Update wieder verfügbar')}</p></div>`;
+    el.innerHTML = `<video class="nx-vid" src="media/gym.mp4" poster="media/gym.jpg" autoplay muted loop playsinline disablepictureinpicture preload="auto" aria-hidden="true"></video><i class="nx-dim" aria-hidden="true"></i>
+      <div class="mx nx">
+        <img class="nx-logo mx-in" src="icons/icon-192.png" alt="Biss">
+        <p class="nx-txt mx-in" style="animation-delay:.15s">${esc(st.text || 'Nach einem Update wieder verfügbar')}</p>
+        <form class="nx-card mx-in" id="nxForm" style="animation-delay:.3s" autocomplete="on" novalidate>
+          <label class="nx-f"><span>E-Mail</span><input type="email" id="nxMail" autocomplete="username" inputmode="email" autocapitalize="off" spellcheck="false" enterkeyhint="next" placeholder="name@beispiel.de"></label>
+          <label class="nx-f"><span>Passwort</span><input type="password" id="nxPw" autocomplete="current-password" enterkeyhint="go" placeholder="••••••••"></label>
+          <button class="nx-btn" type="submit">Anmelden</button>
+          <p class="nx-err" id="nxErr" role="alert"></p>
+        </form>
+        <p class="nx-foot mx-in" style="animation-delay:.45s">© ${new Date().getFullYear()} Biss</p>
+      </div>`;
     const vid = $('.nx-vid', el); vid.muted = true; vid.play().catch(() => {}); // iOS startet stumme Videos sonst manchmal nicht
-    // Für den Besitzer: 7× aufs Logo tippen öffnet den Admin-Login
-    let taps = 0, tT;
-    $('#lockBadge', el).addEventListener('click', () => {
-      clearTimeout(tT); tT = setTimeout(() => { taps = 0; }, 2000);
-      if (++taps >= 7) { taps = 0; showAdminLogin(el, st); }
+    const form = $('#nxForm', el), mail = $('#nxMail', el), pw = $('#nxPw', el), err = $('#nxErr', el);
+    const fail = (msg, field) => { err.textContent = msg; form.classList.remove('shake'); void form.offsetWidth; form.classList.add('shake'); field.focus(); field.select(); };
+    mail.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); pw.focus(); } });
+    form.addEventListener('submit', async ev => {
+      ev.preventDefault();
+      if (Date.now() < admWait) { err.textContent = `Zu viele Versuche. Bitte ${Math.ceil((admWait - Date.now()) / 1000)} Sekunden warten.`; return; }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(mail.value.trim())) return fail('Bitte eine gültige E-Mail-Adresse eingeben.', mail);
+      if (!pw.value) return fail('Bitte das Passwort eingeben.', pw);
+      if (await sha256(pw.value.trim()) === ADMIN_HASH) { admFails = 0; pw.blur(); unlockOwner(el, 'Willkommen zurück'); return; }
+      if (++admFails >= 5) { admWait = Date.now() + 30000; admFails = 0; }
+      fail('E-Mail oder Passwort ist falsch.', pw);
     });
     return;
   }
