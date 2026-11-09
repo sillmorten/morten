@@ -1,5 +1,6 @@
 {
-  "gesperrt": false,
+  "gesperrt": true,
+  "stil": "neon",
   "titel": "Wartungsarbeiten",
-  "text": "Wir machen Biss gerade noch besser. Gleich geht’s weiter."
+  "text": "Nach einem Update wieder verfügbar"
 }
