@@ -33,7 +33,7 @@ const WISH_URL = 'https://formspree.io/f/xeepbyjn';
 const STATS_URL = 'https://wfrtltqzhmeaildtlxga.supabase.co';
 const STATS_KEY = 'sb_publishable_Ic-sGCsYX6A3977v6kDEQA_i0W63MOG';
 // Versionsnummer für die Anzeige in der App. Bei jedem Update zusammen mit VERSION in sw.js hochzählen.
-const APP_VERSION = '1.22.0';
+const APP_VERSION = '1.23.0';
 const KEY = 'kalorien.v1';
 const DEFAULTS = () => ({
   v: 1, setup: false, name: '', greeted: false, goals: { kcal: 2500, c: 280, p: 150, f: 80 }, weightKg: 80, days: {}, foods: {}, weights: [], weighRem: 0, weighSkip: '', lastBackup: null, bkRemind: 7, bkSnooze: 0,
@@ -713,15 +713,24 @@ function refreshOwnFoods() {
 
 /* ---------- Essensideen ---------- */
 // Jede Idee wird zu einem Lebensmittel mit Werten pro 100 g und dem ganzen Gericht als Portion, so geht Eintragen wie bei allem anderen
-const IDEAS = (typeof IDEA_LIST !== 'undefined' ? IDEA_LIST : []).map(([emoji, name, meals, goal, parts]) => {
+const IDEAS = (typeof IDEA_LIST !== 'undefined' ? IDEA_LIST : []).map(([emoji, name, meals, goal, parts]) => buildIdea(emoji, name, meals, goal, parts));
+function buildIdea(emoji, name, meals, goal, parts, base = name) {
   const items = parts.map(([n, g]) => ({ f: BASE['base:' + slug(n)], g })).filter(x => x.f);
   const g = items.reduce((a, x) => a + x.g, 0), t = { kcal: 0, c: 0, p: 0, f: 0 };
   for (const x of items) { const v = calc(x.f, x.g); for (const k in t) t[k] += v[k]; }
   const per = k => Math.round(t[k] / g * 1000) / 10;
-  const [min, steps] = (typeof IDEA_RECIPES !== 'undefined' && IDEA_RECIPES[name]) || [0, []];
+  const [min, steps] = (typeof IDEA_RECIPES !== 'undefined' && IDEA_RECIPES[base]) || [0, []];
   return { id: 'idea:' + slug(name), src: 'idea', name, brand: '', emoji, meals, goal, total: t, kcal: per('kcal'), c: per('c'), p: per('p'), f: per('f'),
     portion: { g, label: `Ganzes Gericht (${n0(g)} g)` }, ingr: items.map(x => `${x.f.name} ${n0(x.g)}\u00a0g`).join(' · '), parts: items.map(x => [x.f.name, x.g]), min, steps };
-});
+}
+// Rezept ohne die abgewählten Zutaten, z. B. „Masse-Shake (ohne Banane)“, mit neu berechneten Werten
+function ideaVariant(i, off) {
+  if (!off.size) return i;
+  const keep = i.parts.filter((_, k) => !off.has(k)), gone = i.parts.filter((_, k) => off.has(k)).map(([n]) => n);
+  if (!keep.length) return null;
+  return buildIdea(i.emoji, `${i.name} (ohne ${gone.join(', ')})`, i.meals, i.goal, keep, i.name);
+}
+let recipeCtx = null;
 const MEAL_SHARE = { b: .25, l: .35, d: .3, s: .12 };
 let ideaCtx = null;
 function ideaGoalDefault() {
@@ -759,15 +768,22 @@ function refreshIdeas() {
 }
 
 function openRecipe(i) {
-  const t = i.total;
-  openLayer('sheet', `
-    <div class="sh"><div class="t"><b>${i.emoji} ${esc(i.name)}</b><span>${i.min ? `⏱ ${i.min} Minuten · ` : ''}1 Portion</span></div><button class="xb" data-act="close" aria-label="Schließen">${icon('x')}</button></div>
+  recipeCtx = { i, off: new Set() };
+  openLayer('sheet', `<div id="recipeBody" style="display:flex;flex-direction:column;gap:14px"></div>`, () => { refreshRecipe(); return () => { recipeCtx = null; }; });
+}
+function refreshRecipe() {
+  const b = $('#recipeBody'); if (!b || !recipeCtx) return;
+  const { i, off } = recipeCtx, v = ideaVariant(i, off), t = v ? v.total : { kcal: 0, c: 0, p: 0, f: 0 };
+  recipeCtx.v = v;
+  b.innerHTML = `
+    <div class="sh"><div class="t"><b>${i.emoji} ${esc(i.name)}</b><span>${i.min ? `⏱ ${i.min} Minuten · ` : ''}1 Portion${off.size ? ` · ohne ${esc(i.parts.filter((_, k) => off.has(k)).map(([n]) => n).join(', '))}` : ''}</span></div><button class="xb" data-act="close" aria-label="Schließen">${icon('x')}</button></div>
     <div class="nut"><div><b class="num">${n0(t.kcal)}</b><span>kcal</span></div><div><b class="num" style="color:var(--org)">${n0(t.c)} g</b><span>KH</span></div><div><b class="num" style="color:var(--grn)">${n0(t.p)} g</b><span>Eiweiß</span></div><div><b class="num" style="color:var(--blu)">${n0(t.f)} g</b><span>Fett</span></div></div>
-    <div class="hdr"><span>Zutaten</span></div>
-    <section class="list">${i.parts.map(([n, g]) => `<div class="it"><div class="n"><b>${esc(n)}</b></div><span class="k num">${n0(g)} g</span></div>`).join('')}</section>
+    <div class="hdr"><span>Zutaten</span>${off.size ? `<button data-act="recipeAll">Alle wieder rein</button>` : ''}</div>
+    <section class="list ingr">${i.parts.map(([n, g], k) => { const on = !off.has(k); return `<button class="it${on ? '' : ' off'}" data-act="recipeToggle" data-k="${k}" aria-pressed="${on}"><span class="chk${on ? ' on' : ''}">${icon('check')}</span><div class="n"><b>${esc(n)}</b></div><span class="k num">${n0(g)} g</span></button>`; }).join('')}</section>
+    <p class="foot" style="margin-top:-6px">${i.parts.length > 1 ? 'Hast du etwas nicht da? Antippen zum Weglassen, die Werte werden neu berechnet.' : ''}</p>
     ${i.steps.length ? `<div class="hdr"><span>Zubereitung</span></div>
     <section class="list recipe">${i.steps.map((st, k) => `<div class="it"><span class="no num">${k + 1}</span><div class="n"><span>${esc(st)}</span></div></div>`).join('')}</section>` : ''}
-    <button class="btn" data-act="pickIdea" data-id="${esc(i.id)}">Zu ${esc(mealOf(ideaCtx?.meal || mealByTime()).name)} hinzufügen</button>`);
+    <button class="btn" data-act="pickIdea" data-id="${esc(v ? v.id : i.id)}" ${v ? '' : 'disabled'}>${v ? `Zu ${esc(mealOf(ideaCtx?.meal || mealByTime()).name)} hinzufügen` : 'Mindestens eine Zutat auswählen'}</button>`;
 }
 
 /* ---------- Makro-Tipps: Lebensmittel, mit denen man KH, Eiweiß oder Fett steigert ---------- */
@@ -1772,7 +1788,9 @@ const ACT = {
   ideaGoal: b => { S.ideaGoal = b.dataset.g; save(); refreshIdeas(); },
   ideaMeal: b => { ideaCtx.meal = b.dataset.meal; refreshIdeas(); },
   recipe: b => { const i = IDEAS.find(x => x.id === b.dataset.id); if (i) openRecipe(i); },
-  pickIdea: b => { const f = getFood(b.dataset.id); if (f) openAmount(S.foods[f.id] ? { ...f, fav: S.foods[f.id].fav, lastG: S.foods[f.id].lastG } : f, { meal: ideaCtx?.meal || mealByTime(), day: ideaCtx?.day || cur }); },
+  recipeToggle: b => { if (!recipeCtx) return; const k = +b.dataset.k, o = recipeCtx.off; o.has(k) ? o.delete(k) : o.add(k); buzz(); refreshRecipe(); },
+  recipeAll: () => { if (recipeCtx) { recipeCtx.off.clear(); refreshRecipe(); } },
+  pickIdea: b => { const f = recipeCtx?.v?.id === b.dataset.id ? recipeCtx.v : getFood(b.dataset.id); if (f) openAmount(S.foods[f.id] ? { ...f, fav: S.foods[f.id].fav, lastG: S.foods[f.id].lastG } : f, { meal: ideaCtx?.meal || mealByTime(), day: ideaCtx?.day || cur }); },
   editEntry: b => {
     const e = getDay(mealSheet.day).food.find(x => x.id === b.dataset.id); if (!e) return;
     if (!e.foodId) { editQuick(e, mealSheet.day); return; }

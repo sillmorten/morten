@@ -443,3 +443,6 @@ button.mc:active { transform: scale(.96); }
 .mtop b { font-size: 40px; font-weight: 800; line-height: 1.1; }
 .mtop span { color: var(--l2); font-size: 15px; }
 .it .n .fit.ok { font-size: 12px; font-weight: 600; color: var(--grn); }
+/* Rezept-Zutaten abwählbar */
+.list.ingr .it { gap: 12px; }
+.list.ingr .it.off .n b, .list.ingr .it.off .k { color: var(--l3); text-decoration: line-through; }
