@@ -454,3 +454,4 @@ button.mc:active { transform: scale(.96); }
 .list.ingr .ig input { width: 3.2em; border: 0; background: transparent; font: inherit; font-size: 16px; font-weight: 600; text-align: right; color: var(--l1); outline: none; padding: 0; }
 .list.ingr .ig span { color: var(--l2); font-size: 15px; }
 .list.ingr .it.off .ig input { color: var(--l3); }
+.it .n span.mtime { font-size: 11px; color: var(--l3); margin-top: 2px; }

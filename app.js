@@ -33,7 +33,7 @@ const WISH_URL = 'https://formspree.io/f/xeepbyjn';
 const STATS_URL = 'https://wfrtltqzhmeaildtlxga.supabase.co';
 const STATS_KEY = 'sb_publishable_Ic-sGCsYX6A3977v6kDEQA_i0W63MOG';
 // Versionsnummer für die Anzeige in der App. Bei jedem Update zusammen mit VERSION in sw.js hochzählen.
-const APP_VERSION = '1.24.0';
+const APP_VERSION = '1.24.1';
 const KEY = 'kalorien.v1';
 const DEFAULTS = () => ({
   v: 1, setup: false, name: '', greeted: false, goals: { kcal: 2500, c: 280, p: 150, f: 80 }, weightKg: 80, days: {}, foods: {}, weights: [], weighRem: 0, weighSkip: '', lastBackup: null, bkRemind: 7, bkSnooze: 0,
@@ -74,10 +74,10 @@ function totals(k) {
 const calc = (food, g) => ({ kcal: food.kcal * g / 100, c: (food.c || 0) * g / 100, p: (food.p || 0) * g / 100, f: (food.f || 0) * g / 100 });
 
 const MEALS = [
-  { id: 'b', name: 'Frühstück', icon: 'sun', g: ['#ffb340', '#ff8a00'] },
-  { id: 'l', name: 'Mittagessen', icon: 'bowl', g: ['#4ee37a', '#24b34b'] },
-  { id: 'd', name: 'Abendessen', icon: 'moon', g: ['#7d7bff', '#4b49d1'] },
-  { id: 's', name: 'Snacks', icon: 'cookie', g: ['#e0a96d', '#b5763a'] },
+  { id: 'b', name: 'Frühstück', time: 'bis 11 Uhr', icon: 'sun', g: ['#ffb340', '#ff8a00'] },
+  { id: 'l', name: 'Mittagessen', time: '11 – 15 Uhr', icon: 'bowl', g: ['#4ee37a', '#24b34b'] },
+  { id: 'd', name: 'Abendessen', time: '18 – 22 Uhr', icon: 'moon', g: ['#7d7bff', '#4b49d1'] },
+  { id: 's', name: 'Snacks', time: '15 – 18 Uhr und ab 22 Uhr', icon: 'cookie', g: ['#e0a96d', '#b5763a'] },
 ];
 /* Eingebaute Lebensmittel (foods.js) */
 const norm = s => String(s || '').toLowerCase().replace(/ä/g, 'a').replace(/ö/g, 'o').replace(/ü/g, 'u').replace(/ß/g, 'ss');
@@ -153,7 +153,7 @@ function viewToday() {
     const es = d.food.filter(e => e.meal === m.id);
     const kc = es.reduce((a, e) => a + e.kcal, 0);
     const sub = es.length ? esc([...new Set(es.map(e => e.name))].join(', ')) : 'Noch nichts eingetragen';
-    return `<div class="it tap" data-act="${es.length ? 'meal' : 'add'}" data-meal="${m.id}" role="button">${tile(m.icon, m.g)}<div class="n"><b>${m.name}</b><span>${sub}</span></div>` +
+    return `<div class="it tap" data-act="${es.length ? 'meal' : 'add'}" data-meal="${m.id}" role="button">${tile(m.icon, m.g)}<div class="n"><b>${m.name}</b><span>${sub}</span><span class="mtime">🕐 ${m.time}</span></div>` +
       (es.length ? `<span class="k num">${n0(kc)}</span><button class="plus" data-act="add" data-meal="${m.id}" aria-label="${m.name}: Lebensmittel hinzufügen">${icon('plus')}</button>` : `<span class="plus">${icon('plus')}</span>`) + `</div>`;
   }).join('');
   const sportSub = d.sport.length ? esc(d.sport.map(s => s.min ? `${s.name} · ${n0(s.min)} min` : s.name).join(', ')) : 'Verbrannte Kalorien eintragen';
