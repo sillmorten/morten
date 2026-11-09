@@ -458,8 +458,8 @@ button.mc:active { transform: scale(.96); }
 
 /* Wartung, schlichte Neon-Variante */
 #lock.neon { background: #000; }
-#lock.neon .nx-fit { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; opacity: .55; }
-#lock.neon .nx-dim { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse 60% 42% at 50% 46%, rgba(0,0,0,.92) 20%, rgba(0,0,0,.35) 70%, rgba(0,0,0,.1) 100%); }
+#lock.neon .nx-vid { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 60% 50%; pointer-events: none; filter: brightness(1.25) contrast(1.05); }
+#lock.neon .nx-dim { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse 60% 42% at 50% 46%, rgba(0,0,0,.45) 12%, rgba(0,0,0,.15) 60%, rgba(0,0,0,.3) 100%); }
 #lock.neon .nb, #lock.neon .ng i { position: absolute; inset: 0; pointer-events: none; border-radius: 46px;
   background: linear-gradient(90deg, #ff0040, #ff8a00, #ffe600, #22ff6a, #00e5ff, #2f6bff, #c400ff, #ff0040); background-size: 300% 300%;
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
