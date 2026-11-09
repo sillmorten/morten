@@ -2,7 +2,7 @@
 
 Aktuelle Version: 1.26.1
 
-Kalorien- und Makro-Tracker fürs iPhone, ohne Abo, ohne Konto, ohne Werbung.
+Kalorien- und Makro-Tracker fürs iPhone, ohne Abo, ohne Konto.
 Alle Daten bleiben lokal auf dem Gerät (localStorage). Lebensmittel kommen von
 [Open Food Facts](https://world.openfoodfacts.org) (ODbL).
 
@@ -21,6 +21,11 @@ Alle Daten bleiben lokal auf dem Gerät (localStorage). Lebensmittel kommen von
 - Makro-Tipps: Antippen von Kohlenhydrate, Eiweiß oder Fett auf „Heute“ zeigt, wie viel noch fehlt, und passende Lebensmittel mit vorgeschlagener Menge zum direkten Eintragen
 - Essensideen zum Abnehmen oder Zunehmen (`ideas.js`), sortiert nach den übrigen Kalorien und dem Eiweiß des Tages, mit einem Tipp eintragbar; im Rezept lassen sich Zutaten abwählen (z. B. ohne Banane) und die Gramm jeder Zutat ändern, die Werte werden neu berechnet
 - Verbesserungswünsche direkt aus der App an den Entwickler senden (Formspree)
+
+## Werbung und Biss Pro (Demo)
+Ausgedachte Anzeigen: Banner auf „Heute“ und im Verlauf, Vollbild alle 20 Minuten Nutzung mit 5 Sekunden Wartezeit. Es wird kein Werbenetzwerk geladen und nichts an Dritte gesendet.
+Biss Pro (unter „Ziele“) blendet die Werbung aus und schaltet eine eigene App-Farbe frei. Freischalten per Demo-Kauf (es wird nichts bezahlt) oder mit dem Code `BISSPRO`. Pro wird nur auf dem Gerät gespeichert (`biss.pro`), nicht im Backup.
+Mit `"werbung": false` in `status.json` ist die Werbung für alle aus.
 
 ## Installation auf dem iPhone
 1. Seite in **Safari** öffnen.
