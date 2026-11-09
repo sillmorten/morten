@@ -515,3 +515,140 @@ button.mc:active { transform: scale(.96); }
 .pro-tag { display: inline-block; vertical-align: 2px; font-size: 11px; font-weight: 800; letter-spacing: .06em; color: #3a2600; background: linear-gradient(180deg, #ffd60a, #f5a300); border-radius: 6px; padding: 2px 6px; margin-left: 4px; }
 .pro-tag.sm { font-size: 9px; padding: 1px 5px; vertical-align: 3px; margin-left: 6px; }
 .it .n span.pro-tag { display: inline-block; color: #3a2600; margin-top: 0; font-size: 9px; }
+
+/* =====================================================================
+   Glas-Optik (1.29): ruhiger, farbiger Hintergrund, darüber durchscheinende,
+   unscharfe Flächen mit feinem hellen Rand und weichem Schatten.
+   ===================================================================== */
+:root {
+  --bg: #eef0f5;
+  --bgimg:
+    radial-gradient(80% 55% at 0% 0%, rgba(255, 196, 206, .75), transparent 70%),
+    radial-gradient(70% 50% at 100% 18%, rgba(186, 208, 255, .8), transparent 70%),
+    radial-gradient(90% 55% at 15% 75%, rgba(198, 236, 222, .7), transparent 70%),
+    radial-gradient(70% 45% at 100% 100%, rgba(232, 214, 255, .7), transparent 70%),
+    linear-gradient(180deg, #f6f6f9, #eceef4);
+  --glass: rgba(255, 255, 255, .46);
+  --glass-hi: rgba(255, 255, 255, .78);
+  --glass-edge: rgba(255, 255, 255, .85);
+  --glass-line: rgba(255, 255, 255, .55);
+  --glass-shadow: inset 0 1px 0 rgba(255, 255, 255, .9), 0 1px 2px rgba(31, 38, 64, .04), 0 12px 32px -14px rgba(31, 38, 64, .22);
+  --blur: blur(24px) saturate(180%);
+  --g1: var(--glass); --sheetcard: rgba(255, 255, 255, .6); --g2: rgba(120, 124, 150, .1);
+  --sheet: rgba(246, 247, 251, .72); --bar: rgba(255, 255, 255, .5); --barline: rgba(255, 255, 255, .9);
+  --sep: rgba(60, 60, 90, .12); --dim: rgba(20, 24, 40, .22);
+  --l2: rgba(40, 44, 66, .62); --l3: rgba(40, 44, 66, .3);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #07080c;
+    --bgimg:
+      radial-gradient(80% 50% at 0% 0%, rgba(255, 55, 95, .26), transparent 70%),
+      radial-gradient(70% 50% at 100% 15%, rgba(70, 100, 230, .32), transparent 70%),
+      radial-gradient(90% 55% at 10% 80%, rgba(20, 150, 140, .2), transparent 70%),
+      radial-gradient(70% 45% at 100% 100%, rgba(130, 70, 220, .26), transparent 70%),
+      linear-gradient(180deg, #0a0b10, #06070a);
+    --glass: rgba(255, 255, 255, .065);
+    --glass-hi: rgba(255, 255, 255, .14);
+    --glass-edge: rgba(255, 255, 255, .13);
+    --glass-line: rgba(255, 255, 255, .08);
+    --glass-shadow: inset 0 1px 0 rgba(255, 255, 255, .1), 0 14px 34px -14px rgba(0, 0, 0, .7);
+    --g1: var(--glass); --sheetcard: rgba(255, 255, 255, .07); --g2: rgba(255, 255, 255, .09);
+    --sheet: rgba(24, 25, 32, .66); --bar: rgba(30, 31, 40, .45); --barline: rgba(255, 255, 255, .14);
+    --sep: rgba(255, 255, 255, .1); --dim: rgba(0, 0, 0, .45);
+    --l2: rgba(235, 235, 245, .62); --l3: rgba(235, 235, 245, .3);
+  }
+}
+
+/* Hintergrund: fest stehend hinter allem (iOS kennt kein background-attachment: fixed) */
+html { background: var(--bg); }
+body { background: transparent; }
+body::before { content: ""; position: fixed; inset: -10vh 0; z-index: -1; background: var(--bgimg); pointer-events: none; }
+.page, .adfull { background: var(--bg); background-image: var(--bgimg); }
+
+/* Glasflächen */
+.card, .list, .mc, .streak, .bkbanner, .ad, .circle, .srch, .scanbtn, .seg, .linkbtn, .pro-code, .ta,
+.nut, .bdg, .wst, .bkstate {
+  background: var(--glass); -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur);
+  border: 1px solid var(--glass-edge); box-shadow: var(--glass-shadow);
+}
+.sheet .list, .sheet .card, .sheet .seg, .nut, .bdg, .wst, .bkstate, .linkbtn, .pro-code, .ta { background: var(--sheetcard); }
+.card, .list, .ad, .bkbanner, .nut, .bkstate, .ta, .pro-code { border-radius: 22px; }
+.mc, .bdg, .wst, .linkbtn { border-radius: 20px; }
+.mc { padding: 12px 6px 10px; }
+.card { padding: 16px 18px; }
+.ad { border-style: solid; }
+.bkbanner { box-shadow: var(--glass-shadow), inset 0 0 0 1px color-mix(in srgb, #ff8a00 30%, transparent); }
+.wbanner { box-shadow: var(--glass-shadow), inset 0 0 0 1px color-mix(in srgb, var(--blu) 30%, transparent); }
+.it + .it::before, .row-in + .row-in::before { border-top-color: var(--sep); }
+button.it:active, .it.tap:active { background: var(--glass-hi); }
+
+/* Runde Knöpfe oben, Suche, Segmente */
+.circle { width: 36px; height: 36px; color: var(--l1); }
+.circle .i { font-size: 17px; }
+.pillbtn { background: var(--glass); border: 1px solid var(--glass-edge); box-shadow: var(--glass-shadow); -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur); }
+.srch, .scanbtn { border-radius: 16px; }
+.scanbtn { width: 50px; }
+.seg { border-radius: 14px; padding: 3px; }
+.seg button { border-radius: 11px; }
+.seg button.on { background: var(--glass-hi); box-shadow: inset 0 1px 0 rgba(255,255,255,.7), 0 2px 8px rgba(31,38,64,.12); }
+@media (prefers-color-scheme: dark) { .seg button.on { background: rgba(255,255,255,.16); box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 2px 8px rgba(0,0,0,.3); } }
+.streak { border-radius: 99px; }
+
+/* Symbol-Kacheln: getöntes Glas statt kräftiger Verläufe */
+.ic {
+  background: color-mix(in srgb, var(--c, var(--tint)) 15%, var(--glass-hi)); color: var(--c, var(--tint)); border-radius: 11px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.55), inset 0 0 0 .5px color-mix(in srgb, var(--c, var(--tint)) 25%, transparent);
+}
+@media (prefers-color-scheme: dark) {
+  .ic { background: color-mix(in srgb, var(--c, var(--tint)) 24%, transparent); color: color-mix(in srgb, var(--c, var(--tint)) 70%, #fff); box-shadow: inset 0 1px 0 rgba(255,255,255,.12), inset 0 0 0 .5px color-mix(in srgb, var(--c, var(--tint)) 35%, transparent); }
+}
+.ic.pro-ic { --c: #e0a100; }
+.ic.ad-ic { color: #fff; }
+.plus { background: color-mix(in srgb, var(--tint) 12%, var(--glass-hi)); box-shadow: inset 0 1px 0 rgba(255,255,255,.5); }
+@media (prefers-color-scheme: dark) { .plus { background: color-mix(in srgb, var(--tint) 20%, transparent); box-shadow: none; } }
+
+/* Tab-Leiste: schwebendes Glas */
+.tabbar {
+  height: 66px; border-radius: 33px; background: var(--bar); border: 1px solid var(--barline);
+  -webkit-backdrop-filter: blur(30px) saturate(200%); backdrop-filter: blur(30px) saturate(200%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.7), 0 18px 40px -16px rgba(31,38,64,.35);
+}
+@media (prefers-color-scheme: dark) { .tabbar { box-shadow: inset 0 1px 0 rgba(255,255,255,.1), 0 18px 40px -12px rgba(0,0,0,.8); } }
+.tb { padding: 7px 20px; border-radius: 26px; }
+.tb.on { background: var(--glass-hi); box-shadow: inset 0 1px 0 rgba(255,255,255,.7), 0 2px 10px rgba(31,38,64,.1); }
+@media (prefers-color-scheme: dark) { .tb.on { background: rgba(255,255,255,.12); box-shadow: inset 0 1px 0 rgba(255,255,255,.12); } }
+
+/* Sheets und Seiten */
+.dim { -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); }
+.sheet {
+  background: var(--sheet); -webkit-backdrop-filter: blur(40px) saturate(180%); backdrop-filter: blur(40px) saturate(180%);
+  border-radius: 30px 30px 0 0; border: 1px solid var(--glass-edge); border-bottom: 0;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.6), 0 -12px 40px -10px rgba(31,38,64,.25);
+}
+@media (prefers-color-scheme: dark) { .sheet { box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 -12px 40px -10px rgba(0,0,0,.7); } }
+.grab { background: var(--l3); opacity: .7; }
+.xb { background: var(--glass-hi); box-shadow: inset 0 1px 0 rgba(255,255,255,.5); }
+@media (prefers-color-scheme: dark) { .xb { background: rgba(255,255,255,.1); box-shadow: none; } }
+.page .sticky { background: var(--bar); -webkit-backdrop-filter: blur(30px) saturate(180%); backdrop-filter: blur(30px) saturate(180%); border-bottom: .5px solid var(--glass-line); margin-left: -16px; margin-right: -16px; padding-left: 16px; padding-right: 16px; }
+.pill, .chip { background: var(--glass); border: 1px solid var(--glass-edge); box-shadow: inset 0 1px 0 rgba(255,255,255,.5); }
+.pill.on { background: color-mix(in srgb, var(--tint) 16%, var(--glass-hi)); border-color: color-mix(in srgb, var(--tint) 30%, transparent); }
+.chip.on { border-color: transparent; }
+
+/* Knöpfe */
+.btn { border-radius: 18px; background-image: linear-gradient(180deg, rgba(255,255,255,.22), rgba(255,255,255,0) 60%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.35), 0 10px 24px -10px color-mix(in srgb, var(--tint) 70%, transparent); }
+.btn.sec { background: var(--glass); background-image: none; border: 1px solid var(--glass-edge); box-shadow: var(--glass-shadow); -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur); }
+.btn.del { box-shadow: none; background-image: none; }
+
+/* Meldung unten */
+#toast { background: rgba(20, 22, 30, .72); color: #fff; border: 1px solid rgba(255,255,255,.14); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); box-shadow: 0 10px 30px -10px rgba(0,0,0,.4); }
+
+/* Schwächere Geräte und reduzierte Transparenz: deckende Flächen statt Unschärfe */
+@media (prefers-reduced-transparency: reduce) {
+  :root { --glass: #fff; --sheetcard: #fff; --sheet: #f2f2f7; --bar: #f9f9fb; }
+  .card, .list, .mc, .sheet, .tabbar, .page .sticky { -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+@media (prefers-reduced-transparency: reduce) and (prefers-color-scheme: dark) {
+  :root { --glass: #1c1c1e; --sheetcard: #2c2c2e; --sheet: #1c1c1e; --bar: #1c1c1e; }
+}

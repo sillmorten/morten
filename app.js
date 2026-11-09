@@ -33,7 +33,7 @@ const WISH_URL = 'https://formspree.io/f/xeepbyjn';
 const STATS_URL = 'https://wfrtltqzhmeaildtlxga.supabase.co';
 const STATS_KEY = 'sb_publishable_Ic-sGCsYX6A3977v6kDEQA_i0W63MOG';
 // Versionsnummer für die Anzeige in der App. Bei jedem Update zusammen mit VERSION in sw.js hochzählen.
-const APP_VERSION = '1.28.0';
+const APP_VERSION = '1.29.0';
 const KEY = 'kalorien.v1';
 const DEFAULTS = () => ({
   v: 1, setup: false, name: '', greeted: false, goals: { kcal: 2500, c: 280, p: 150, f: 80 }, weightKg: 80, days: {}, foods: {}, weights: [], weighRem: 0, weighSkip: '', lastBackup: null, bkRemind: 7, bkSnooze: 0,
@@ -94,7 +94,8 @@ const getFood = id => S.foods[id] || BASE[id] || IDEAS.find(i => i.id === id);
 const POPULAR = ['Ei', 'Banane', 'Haferflocken', 'Skyr natur', 'Magerquark', 'Hähnchenbrust roh', 'Reis gekocht', 'Nudeln gekocht', 'Vollkornbrot', 'Apfel', 'Milch 1,5 %', 'Kartoffeln gekocht'].map(n => 'base:' + slug(n));
 
 const mealOf = id => MEALS.find(m => m.id === id) || MEALS[3];
-const tile = (ic, g) => `<span class="ic" style="background:linear-gradient(180deg,${g[0]},${g[1]})">${icon(ic)}</span>`;
+// Glas-Kachel: getönte, durchscheinende Fläche mit farbigem Symbol
+const tile = (ic, g) => `<span class="ic" style="--c:${g[1]}">${icon(ic)}</span>`;
 function mealByTime() { const h = new Date().getHours(); return h < 11 ? 'b' : h < 15 ? 'l' : h < 18 ? 's' : h < 22 ? 'd' : 's'; }
 
 const SPORTS = [
@@ -153,7 +154,7 @@ function viewToday() {
     const es = d.food.filter(e => e.meal === m.id);
     const kc = es.reduce((a, e) => a + e.kcal, 0);
     const sub = es.length ? esc([...new Set(es.map(e => e.name))].join(', ')) : 'Noch nichts eingetragen';
-    return `<div class="it tap" data-act="${es.length ? 'meal' : 'add'}" data-meal="${m.id}" role="button">${tile(m.icon, m.g)}<div class="n"><b>${m.name}</b><span>${sub}</span><span class="mtime">🕐 ${m.time}</span></div>` +
+    return `<div class="it tap" data-act="${es.length ? 'meal' : 'add'}" data-meal="${m.id}" role="button">${tile(m.icon, m.g)}<div class="n"><b>${m.name}</b><span>${sub}</span><span class="mtime">${m.time}</span></div>` +
       (es.length ? `<span class="k num">${n0(kc)}</span><button class="plus" data-act="add" data-meal="${m.id}" aria-label="${m.name}: Lebensmittel hinzufügen">${icon('plus')}</button>` : `<span class="plus">${icon('plus')}</span>`) + `</div>`;
   }).join('');
   const sportSub = d.sport.length ? esc(d.sport.map(s => s.min ? `${s.name} · ${n0(s.min)} min` : s.name).join(', ')) : 'Verbrannte Kalorien eintragen';
@@ -184,7 +185,7 @@ function viewToday() {
   </section>
   ${weighRow()}
   ${adBanner(0)}
-  ${IDEAS.length ? `<section class="list icons"><button class="it" data-act="ideas">${tile('bowl', ['#5ac8fa', '#1a8fd6'])}<div class="n"><b>Essensideen 💡${proTag()}</b><span>${isPro() ? ideasSub() : 'Rezepte und Gerichte mit Biss Pro'}</span></div><span class="chev">${icon('right')}</span></button></section>` : ''}
+  ${IDEAS.length ? `<section class="list icons"><button class="it" data-act="ideas">${tile('bowl', ['#5ac8fa', '#1a8fd6'])}<div class="n"><b>Essensideen${proTag()}</b><span>${isPro() ? ideasSub() : 'Rezepte und Gerichte mit Biss Pro'}</span></div><span class="chev">${icon('right')}</span></button></section>` : ''}
   <div class="hdr"><span>Mahlzeiten</span></div>
   <section class="list icons">
     ${meals}
@@ -208,11 +209,11 @@ function streakPill() {
 
 function greeting() {
   const h = new Date().getHours(), n = esc(S.name);
-  if (h < 5) return `Noch wach, ${n}? 🌙`;
-  if (h < 11) return `Guten Morgen, ${n} ☀️`;
-  if (h < 17) return `Hey ${n}, läuft bei dir 💪`;
-  if (h < 22) return `Guten Abend, ${n} 👋`;
-  return `Gute Nacht, ${n} 😴`;
+  if (h < 5) return `Noch wach, ${n}?`;
+  if (h < 11) return `Guten Morgen, ${n}`;
+  if (h < 17) return `Hey ${n}, läuft bei dir`;
+  if (h < 22) return `Guten Abend, ${n}`;
+  return `Gute Nacht, ${n}`;
 }
 
 /* ---------- Verlauf ---------- */
@@ -277,7 +278,7 @@ function viewHistory() {
   </section>
   <section class="list icons">
     <div class="it">${tile('egg', ['#4ee37a', '#24b34b'])}<div class="n"><b>Eiweiß</b><span>${base.length ? `Ø ${n0(pAvg)} g · Ziel ${n0(S.goals.p)} g` : 'Keine Daten in diesem Zeitraum'}</span></div>${base.length && pAvg >= S.goals.p * .95 ? `<span style="color:var(--grn);font-size:22px">${icon('check')}</span>` : ''}</div>
-    <div class="it"><span class="ic" style="background:linear-gradient(180deg,#ffb340,#ff8a00)">${icon('bolt')}</span><div class="n"><b>Makros im Schnitt</b><span>${base.length ? `${n0(avg('c'))} g KH · ${n0(pAvg)} g Eiweiß · ${n0(avg('f'))} g Fett` : 'Keine Daten in diesem Zeitraum'}</span></div></div>
+    <div class="it"><span class="ic" style="--c:#ff8a00">${icon('bolt')}</span><div class="n"><b>Makros im Schnitt</b><span>${base.length ? `${n0(avg('c'))} g KH · ${n0(pAvg)} g Eiweiß · ${n0(avg('f'))} g Fett` : 'Keine Daten in diesem Zeitraum'}</span></div></div>
     <button class="it" data-act="weight">${tile('scales', ['#40a0ff', '#0a6fe0'])}<div class="n"><b>Körpergewicht</b><span>${lastW ? `${n1(lastW.kg)} kg${wPace !== null ? ` · ${signKg(wPace)} pro Woche` : wDiff !== null ? ` · ${signKg(wDiff)} in 30 Tagen` : ''}` : 'Morgens nüchtern wiegen'}</span></div><span class="chev">${icon('right')}</span></button>
     <button class="it" data-act="body">${tile('ruler', ['#5ac8fa', '#1a9bd7'])}<div class="n"><b>Körpermaße & Fotos</b><span>${bodySub()}</span></div><span class="chev">${icon('right')}</span></button>
     <button class="it" data-act="badges">${tile('trophy', ['#ffd60a', '#f5a300'])}<div class="n"><b>Streaks & Abzeichen${proTag()}</b><span>${isPro() ? `${earnedCount()} von ${BADGES.length} Abzeichen` : 'Mit Biss Pro'}</span></div><span class="chev">${icon('right')}</span></button>
@@ -508,7 +509,7 @@ function renderAddBody() {
     } else html += list.length ? `<section class="list">${list.map(f => foodRow(f)).join('')}</section>` : `<p class="empty">${empty}</p>`;
   }
   html += `<section class="list icons">
-    ${IDEAS.length ? `<button class="it" data-act="ideas">${tile('bowl', ['#5ac8fa', '#1a8fd6'])}<div class="n"><b>Essensideen 💡${proTag()}</b><span>Gerichte zum Abnehmen oder Zunehmen</span></div><span class="chev">${icon('right')}</span></button>` : ''}
+    ${IDEAS.length ? `<button class="it" data-act="ideas">${tile('bowl', ['#5ac8fa', '#1a8fd6'])}<div class="n"><b>Essensideen${proTag()}</b><span>Gerichte zum Abnehmen oder Zunehmen</span></div><span class="chev">${icon('right')}</span></button>` : ''}
     <button class="it" data-act="newFood">${tile('pencil', ['#a1a1a6', '#6e6e73'])}<div class="n"><b>Eigenes Lebensmittel anlegen</b><span>Werte von der Packung abtippen</span></div><span class="chev">${icon('right')}</span></button>
     <button class="it" data-act="quick">${tile('bolt', ['#ffb340', '#ff8a00'])}<div class="n"><b>Schnell eintragen</b><span>Nur Kalorien, z. B. beim Essen auswärts</span></div><span class="chev">${icon('right')}</span></button>
   </section>`;
