@@ -33,7 +33,7 @@ const WISH_URL = 'https://formspree.io/f/xeepbyjn';
 const STATS_URL = 'https://wfrtltqzhmeaildtlxga.supabase.co';
 const STATS_KEY = 'sb_publishable_Ic-sGCsYX6A3977v6kDEQA_i0W63MOG';
 // Versionsnummer für die Anzeige in der App. Bei jedem Update zusammen mit VERSION in sw.js hochzählen.
-const APP_VERSION = '1.24.4';
+const APP_VERSION = '1.25.0';
 const KEY = 'kalorien.v1';
 const DEFAULTS = () => ({
   v: 1, setup: false, name: '', greeted: false, goals: { kcal: 2500, c: 280, p: 150, f: 80 }, weightKg: 80, days: {}, foods: {}, weights: [], weighRem: 0, weighSkip: '', lastBackup: null, bkRemind: 7, bkSnooze: 0,
@@ -2003,67 +2003,6 @@ const lockBypassed = (st = lockState()) => !relocked() && !!st && lsGet(OWNER_KE
 const lockState = () => { try { return JSON.parse(lsGet(LOCK_KEY) || 'null'); } catch (e) { return null; } };
 let lockTick = 0;
 
-// Animierter Fitness-Hintergrund hinter dem Logo (selbst gezeichnet, keine Lizenz nötig):
-// Neon-Figuren machen Kniebeugen mit Langhantel, Bizeps-Curls, Hampelmänner und Schulterdrücken.
-function fitnessLoop(cv) {
-  if (!cv) return;
-  const ctx = cv.getContext('2d');
-  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const D = Math.PI / 180, wave = t => (1 - Math.cos(t * 2 * Math.PI)) / 2;
-  let W = 0, H = 0, dpr = 1;
-  const fit = () => { dpr = Math.min(devicePixelRatio || 1, 2); W = cv.clientWidth; H = cv.clientHeight; cv.width = W * dpr; cv.height = H * dpr; };
-  const P = (o, len, ang) => [o[0] + Math.sin(ang) * len, o[1] - Math.cos(ang) * len]; // Winkel 0 = nach oben
-  const line = (...pts) => { ctx.beginPath(); ctx.moveTo(...pts[0]); pts.slice(1).forEach(q => ctx.lineTo(...q)); ctx.stroke(); };
-  const bell = (c, ang, w) => { // Hantel quer zur Richtung ang
-    const a = [c[0] + Math.cos(ang) * w, c[1] + Math.sin(ang) * w], b = [c[0] - Math.cos(ang) * w, c[1] - Math.sin(ang) * w];
-    line(a, b); [a, b].forEach(q => { ctx.beginPath(); ctx.arc(q[0], q[1], w * .45, 0, 7); ctx.fill(); });
-  };
-  const body = (hip, torso, neck) => { line(hip, neck); ctx.beginPath(); ctx.arc(neck[0] + Math.sin(torso) * 9, neck[1] - Math.cos(torso) * 9, 7, 0, 7); ctx.fill(); };
-  // Jede Übung zeichnet eine Figur, Füße bei (0,0), Körperhöhe ca. 100
-  const moves = [
-    s => { // Kniebeuge mit Langhantel (Seitenansicht)
-      const knee = P([0, 0], 24, 35 * D * s), hip = P(knee, 24, -80 * D * s), tor = 32 * D * s, neck = P(hip, 34, tor);
-      line([6, 0], [0, 0], knee, hip); line([2, 0], [-4, 0], P([-4, 0], 24, 33 * D * s), hip); body(hip, tor, neck);
-      const sh = P(hip, 27, tor), bar = P(sh, 5, tor - 90 * D), el = P(sh, 13, tor + 150 * D); line(sh, el, bar);
-      ctx.beginPath(); ctx.arc(bar[0], bar[1], 9, 0, 7); ctx.stroke(); ctx.beginPath(); ctx.arc(bar[0], bar[1], 3, 0, 7); ctx.fill();
-    },
-    s => { // Bizeps-Curl (Seitenansicht)
-      const hip = [0, -48], neck = P(hip, 34, 0); line([-5, 0], [0, -24], hip); line([7, 0], [2, -24], hip); body(hip, 0, neck);
-      const sh = P(hip, 31, 0), el = P(sh, 16, 172 * D), hand = P(el, 15, 180 * D - 145 * D * s); line(sh, el, hand); bell(hand, 0, 7);
-    },
-    s => { // Hampelmann (Vorderansicht)
-      const up = -5 * s, hip = [0, -48 + up], neck = P(hip, 34, 0), sp = 22 * D * s, sh = P(hip, 31, 0);
-      line(P(hip, 48, 180 * D + sp), hip, P(hip, 48, 180 * D - sp)); body(hip, 0, neck);
-      const a = (170 - 145 * s) * D; line(P(sh, 30, a), sh, P(sh, 30, -a));
-    },
-    s => { // Schulterdrücken mit Kurzhanteln (Vorderansicht)
-      const hip = [0, -48], neck = P(hip, 34, 0), sh = P(hip, 31, 0); line([-9, 0], hip, [9, 0]); body(hip, 0, neck);
-      [1, -1].forEach(k => { const s0 = [sh[0] + k * 9, sh[1] + 2], el = P(s0, 15, k * (100 - 70 * s) * D), h = P(el, 15, k * (10 - 5 * s) * D); line(sh, s0, el, h); bell(h, 0, 6); });
-    }
-  ];
-  const draw = now => {
-    if (!cv.isConnected) return;
-    if (cv.clientWidth !== W || cv.clientHeight !== H) fit();
-    const t = now / 1000;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
-    ctx.lineCap = ctx.lineJoin = 'round';
-    const n = W < 520 ? 2 : 4, sc = Math.min(W / n / 95, H / 380), base = H * .9;
-    // Boden-Linien wie in einem Studio
-    ctx.strokeStyle = 'rgba(255,255,255,.07)'; ctx.lineWidth = 1;
-    for (let i = 0; i < 6; i++) { const y = base + i * i * 4 + 2; line([0, y], [W, y]); }
-    for (let r = 0; r < (n === 2 ? 2 : 1); r++) for (let i = 0; i < n; i++) {
-      const k = (i + r * n) % moves.length, hue = (t * 40 + k * 90) % 360;
-      const x = W * (i + .5) / n, y = r ? H * .36 : base, f = r ? sc * .75 : sc;
-      ctx.save(); ctx.translate(x, y); ctx.scale(f, f);
-      ctx.strokeStyle = ctx.fillStyle = `hsl(${hue} 100% 62%)`; ctx.lineWidth = 5;
-      ctx.shadowColor = `hsl(${hue} 100% 55%)`; ctx.shadowBlur = 18 * f;
-      moves[k](still ? .5 : wave(t / (1.6 + k * .25) + k * .2));
-      ctx.restore();
-    }
-    if (!still) requestAnimationFrame(draw);
-  };
-  fit(); requestAnimationFrame(draw);
-}
 function hideLock(el) { clearInterval(lockTick); if (el) el.remove(); lockSig = ''; }
 // Edle Wartungs-Seite: filmischer Hintergrund und Statuszeile
 function showLock(st) {
@@ -2077,10 +2016,10 @@ function showLock(st) {
   // Schlichte Variante: nur Logo und ein Satz, am Rand ein wandernder RGB-Neonverlauf ("stil": "neon" in status.json)
   if (st.stil === 'neon') {
     clearInterval(lockTick);
-    el.innerHTML = `<canvas class="nx-fit" aria-hidden="true"></canvas><i class="nx-dim" aria-hidden="true"></i><i class="nb" aria-hidden="true"></i><i class="ng" aria-hidden="true"><i></i></i>
+    el.innerHTML = `<video class="nx-vid" src="media/gym.mp4" poster="media/gym.jpg" autoplay muted loop playsinline disablepictureinpicture preload="auto" aria-hidden="true"></video><i class="nx-dim" aria-hidden="true"></i><i class="nb" aria-hidden="true"></i><i class="ng" aria-hidden="true"><i></i></i>
       <div class="mx"><button class="nx-logo mx-in" id="lockBadge" aria-label="Biss"><img src="icons/icon-192.png" alt=""></button>
       <p class="nx-txt mx-in" style="animation-delay:.3s">${esc(st.text || 'Nach einem Update wieder verfügbar')}</p></div>`;
-    fitnessLoop($('.nx-fit', el));
+    const vid = $('.nx-vid', el); vid.muted = true; vid.play().catch(() => {}); // iOS startet stumme Videos sonst manchmal nicht
     // Für den Besitzer: 7× aufs Logo tippen öffnet den Admin-Login
     let taps = 0, tT;
     $('#lockBadge', el).addEventListener('click', () => {
