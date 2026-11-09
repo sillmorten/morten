@@ -33,7 +33,7 @@ const WISH_URL = 'https://formspree.io/f/xeepbyjn';
 const STATS_URL = 'https://wfrtltqzhmeaildtlxga.supabase.co';
 const STATS_KEY = 'sb_publishable_Ic-sGCsYX6A3977v6kDEQA_i0W63MOG';
 // Versionsnummer für die Anzeige in der App. Bei jedem Update zusammen mit VERSION in sw.js hochzählen.
-const APP_VERSION = '1.26.1';
+const APP_VERSION = '1.27.1';
 const KEY = 'kalorien.v1';
 const DEFAULTS = () => ({
   v: 1, setup: false, name: '', greeted: false, goals: { kcal: 2500, c: 280, p: 150, f: 80 }, weightKg: 80, days: {}, foods: {}, weights: [], weighRem: 0, weighSkip: '', lastBackup: null, bkRemind: 7, bkSnooze: 0,
@@ -167,7 +167,7 @@ function viewToday() {
     </div>
   </header>
   <h1 class="lt" data-act="calendar"><small>${longDate(cur)}${kdate(cur).getFullYear() !== new Date().getFullYear() ? ' ' + kdate(cur).getFullYear() : ''}</small>${dayTitle(cur)}</h1>
-  ${isToday && S.name ? `<p class="greet">${greeting()}</p>` : ''}
+  ${isToday && S.name ? `<p class="greet">${greeting()}${isPro() ? ' <span class="pro-tag">PRO</span>' : ''}</p>` : ''}
   ${isToday ? streakPill() : ''}
   ${weighDue() ? weighBanner() : isToday && backupDue() ? backupBanner() : ''}
   <section class="card hero">
@@ -183,6 +183,7 @@ function viewToday() {
     ${macro(t.c, g.c, 'var(--org)', 'Kohlenhydrate', 'c')}${macro(t.p, g.p, 'var(--grn)', 'Eiweiß', 'p')}${macro(t.f, g.f, 'var(--blu)', 'Fett', 'f')}
   </section>
   ${weighRow()}
+  ${adBanner(0)}
   ${IDEAS.length ? `<section class="list icons"><button class="it" data-act="ideas">${tile('bowl', ['#5ac8fa', '#1a8fd6'])}<div class="n"><b>Essensideen 💡</b><span>${ideasSub()}</span></div><span class="chev">${icon('right')}</span></button></section>` : ''}
   <div class="hdr"><span>Mahlzeiten</span></div>
   <section class="list icons">
@@ -282,6 +283,7 @@ function viewHistory() {
     <button class="it" data-act="badges">${tile('trophy', ['#ffd60a', '#f5a300'])}<div class="n"><b>Streaks & Abzeichen</b><span>${earnedCount()} von ${BADGES.length} Abzeichen</span></div><span class="chev">${icon('right')}</span></button>
     <button class="it" data-act="backup">${tile('cloud', backupAge !== null && backupAge < 30 || !hasAny ? ['#a1a1a6', '#6e6e73'] : ['#ffb340', '#ff8a00'])}<div class="n"><b>Backup</b><span>${backupSub}</span></div><span class="chev">${icon('right')}</span></button>
   </section>
+  ${adBanner(1)}
   ${days ? (r === 'week' ? `<div class="hdr"><span>Tage</span></div>` : '') + days : `<p class="empty">${hasAny ? 'In diesem Zeitraum ist nichts eingetragen.' : 'Hier erscheinen deine Tage, sobald du etwas eingetragen hast.'}</p>`}`;
 }
 const dayRow = r => `<button class="it" data-act="openday" data-k="${r.k}"><div class="n"><b>${shortDate(r.k)}${r.k === todayKey() ? ' · heute' : ''}</b></div><span class="k num">${n0(r.kcal)} kcal · ${n0(r.p)} g Eiweiß</span><span class="chev">${icon('right')}</span></button>`;
@@ -371,6 +373,7 @@ function viewGoals() {
   return `
   <header class="nav"></header>
   <h1 class="lt">Ziele</h1>
+  <section class="list icons"><button class="it" data-act="pro"><span class="ic pro-ic">${CROWN}</span><div class="n"><b>${isPro() ? 'Biss Pro ist aktiv 👑' : 'Biss Pro holen'}</b><span>${proSub()}</span></div><span class="chev">${icon('right')}</span></button></section>
   <section class="list icons"><button class="it" data-act="calc">${tile('target', ['#ff5c7c', '#e8264d'])}<div class="n"><b>${S.profile ? 'Ziele neu berechnen' : 'Ziele berechnen lassen'}</b><span>${goalSub()}</span></div><span class="chev">${icon('right')}</span></button></section>
   <div class="hdr"><span>Tagesziele</span></div>
   <section class="list">
@@ -398,7 +401,7 @@ function viewGoals() {
   <section class="list icons"><button class="it" data-act="wish">${tile('sparkle', ['#ffd60a', '#f5a300'])}<div class="n"><b>Wunsch senden 💡</b><span>Was fehlt dir? Sag’s dem Entwickler</span></div><span class="chev">${icon('right')}</span></button></section>` : ''}
   ${DONATE_URL ? `<div class="hdr"><span>Unterstützen</span></div>
   <section class="list icons"><a class="it" href="${esc(DONATE_URL)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">${tile('paypal', ['#009cde', '#003087'])}<div class="n"><b>Entwickler unterstützen ☕</b><span>Freiwillige Spende per PayPal</span></div><span class="chev">${icon('right')}</span></a></section>` : ''}
-  <p class="foot">Alle Daten bleiben auf diesem Gerät. Es gibt kein Konto und keine Werbung. Eingebaute Lebensmittel sind Richtwerte. Die Online-Suche und der Barcode-Scan nutzen Open Food Facts (offene Datenbank, ODbL).${STATS_URL ? ' Biss zählt anonym, wie oft und wie lange die App geöffnet wird. Dabei werden kein Name, keine dauerhafte Kennung und keine Einträge gesendet.' : ''}</p>
+  <p class="foot">Alle Daten bleiben auf diesem Gerät. Es gibt kein Konto.${adsOn() ? ' Die Werbung ist nur eine Demo mit ausgedachten Anzeigen, es werden keine Daten an Werbefirmen gesendet.' : ''} Eingebaute Lebensmittel sind Richtwerte. Die Online-Suche und der Barcode-Scan nutzen Open Food Facts (offene Datenbank, ODbL).${STATS_URL ? ' Biss zählt anonym, wie oft und wie lange die App geöffnet wird. Dabei werden kein Name, keine dauerhafte Kennung und keine Einträge gesendet.' : ''}</p>
   <section class="list"><button class="it danger" data-act="wipe">Alle Daten löschen</button></section>
   ${(lockState() || {}).gesperrt && lockBypassed() ? `<div class="hdr"><span>Sperre</span></div>
   <section class="list icons"><button class="it" data-act="lockPreview">${tile('warn', ['#ff6b8a', '#e3123f'])}<div class="n"><b>Auf diesem Handy sperren</b><span>Wieder rein: „Ich bin Admin“ und Passwort</span></div><span class="chev">${icon('right')}</span></button></section>` : ''}
@@ -1860,6 +1863,9 @@ const ACT = {
   bkLater: () => { S.bkSnooze = Date.now() + 3 * 864e5; save(); render(); toast('Ich erinnere dich in 3 Tagen'); },
   healthHelp: () => openHealthHelp(),
   shareApp: () => openShare(),
+  pro: () => openPro(),
+  proFromAd: () => { const a = $('.adfull'); if (a && a.closeAd) a.closeAd(); openPro(); },
+  adCta: () => toast('Demo-Anzeige: Hier würde die Seite des Werbepartners öffnen'),
   shareLink: () => shareLink(),
   lockPreview: () => { lsSet(RELOCK_KEY, '1'); showLock(lockState() || { gesperrt: true }); },
   range: b => { histRange = b.dataset.n; histOff = 0; render(); },
@@ -2119,26 +2125,146 @@ try { showLock(JSON.parse(lsGet(LOCK_KEY) || 'null')); } catch (e) { /* kein Sta
 checkLock();
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkLock(); });
 
+/* ---------- Demo-Werbung und Biss Pro (nur Test, keine echte Werbung, keine echte Zahlung) ---------- */
+// Pro liegt bewusst nicht in S, damit es nicht mit dem Backup auf andere Handys wandert.
+const PRO_KEY = 'biss.pro', AD_TIME_KEY = 'biss.adzeit';
+const PRO_PRICE = '2,99 €';
+const PRO_CODE_HASH = '6f9b6d17de12eeed10c272a99e7781252bbbfad994e5e23e07816d3b3583d430'; // Test-Code als SHA-256-Hash (Code steht nicht im Klartext im Code)
+const PRO_COLORS = [['#ff2d55', 'Pink'], ['#007aff', 'Blau'], ['#28b350', 'Grün'], ['#ff9500', 'Orange'], ['#af52de', 'Lila'], ['#00a99d', 'Türkis']];
+const proState = () => { try { return JSON.parse(lsGet(PRO_KEY) || 'null'); } catch (e) { return null; } };
+const isPro = () => !!(proState() || {}).on;
+// Werbung lässt sich in status.json mit "werbung": false für alle ausschalten
+const adsOn = () => !isPro() && (lockState() || {}).werbung !== false;
+function applyProColor() {
+  const p = proState(), c = p && p.on && p.color;
+  if (c && c !== PRO_COLORS[0][0]) document.documentElement.style.setProperty('--tint', c);
+  else document.documentElement.style.removeProperty('--tint');
+}
+function setPro(on, via) {
+  const p = proState() || {};
+  lsSet(PRO_KEY, JSON.stringify(on ? { ...p, on: true, via, since: p.on ? p.since : Date.now() } : { color: p.color, on: false }));
+  applyProColor(); render();
+}
+const DEMO_ADS = [
+  { e: '🥤', g: ['#4ee37a', '#24b34b'], t: 'ShakeMax Protein', s: '30 g Eiweiß pro Shake, nur 120 kcal', c: 'Jetzt testen' },
+  { e: '👟', g: ['#40a0ff', '#0a6fe0'], t: 'RunFast Laufschuhe', s: 'Leicht, gedämpft, bis −30 % im Sale', c: 'Zum Shop' },
+  { e: '🏋️', g: ['#ff5c7c', '#e8264d'], t: 'Gym Nord', s: 'Probetraining kostenlos in deiner Nähe', c: 'Termin holen' },
+  { e: '🥗', g: ['#ffb340', '#ff8a00'], t: 'FreshBox Kochboxen', s: 'Gesund kochen in 20 Minuten', c: 'Mehr erfahren' },
+  { e: '💧', g: ['#5ac8fa', '#1a8fd6'], t: 'AquaFit Flasche', s: 'Trinkflasche, die ans Trinken erinnert', c: 'Ansehen' },
+];
+let adSeed = Math.floor(Math.random() * DEMO_ADS.length);
+function adBanner(slot = 0) {
+  if (!adsOn()) return '';
+  const i = (adSeed + slot) % DEMO_ADS.length, a = DEMO_ADS[i];
+  return `<section class="ad" aria-label="Demo-Anzeige">
+    <div class="ad-top"><span class="ad-lbl">Anzeige · Demo</span><button class="ad-off" data-act="pro">${icon('x')}Ohne Werbung</button></div>
+    <div class="ad-row"><span class="ic ad-ic" style="background:linear-gradient(180deg,${a.g[0]},${a.g[1]})">${a.e}</span><div class="n"><b>${a.t}</b><span>${a.s}</span></div><button class="ad-cta" data-act="adCta">${a.c}</button></div>
+  </section>`;
+}
+// Vollbild-Werbung nach jeweils 20 Minuten Nutzung (nur gezählt, solange die App offen und sichtbar ist)
+const AD_EVERY = 20 * 60 * 1000, AD_TICK = 15 * 1000;
+setInterval(() => {
+  if (document.visibilityState !== 'visible' || !adsOn() || $('#lock') || $('.adfull')) return;
+  const used = (parseInt(lsGet(AD_TIME_KEY), 10) || 0) + AD_TICK;
+  if (used < AD_EVERY) { lsSet(AD_TIME_KEY, String(used)); return; }
+  lsSet(AD_TIME_KEY, '0'); showInterstitial();
+}, AD_TICK);
+function showInterstitial() {
+  if (!adsOn() || $('.adfull')) return;
+  const a = DEMO_ADS[(adSeed++) % DEMO_ADS.length];
+  const el = document.createElement('div'); el.className = 'adfull';
+  el.innerHTML = `<div class="adfull-top"><span class="ad-lbl">Anzeige · Demo</span><button class="adfull-x" disabled aria-label="Schließen">5</button></div>
+    <div class="adfull-body" style="--a:${a.g[0]};--b:${a.g[1]}"><div class="adfull-e">${a.e}</div><h2>${a.t}</h2><p>${a.s}</p><button class="adfull-cta" data-act="adCta">${a.c}</button></div>
+    <button class="adfull-pro" data-act="proFromAd">👑 Mit Biss Pro ohne Werbung</button>`;
+  document.body.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('in'));
+  const x = $('.adfull-x', el); let s = 5;
+  const t = setInterval(() => { s--; if (s > 0) { x.textContent = s; return; } clearInterval(t); x.disabled = false; x.innerHTML = icon('x'); }, 1000);
+  const close = () => { clearInterval(t); el.classList.remove('in'); setTimeout(() => el.remove(), 250); };
+  x.addEventListener('click', close);
+  el.closeAd = close;
+}
+const CROWN = `<svg class="i" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M32 72l52 52 44-68 44 68 52-52-20 120H52z"/><rect x="52" y="204" width="152" height="20" rx="6"/></svg>`;
+function proSub() {
+  const p = proState();
+  return p && p.on ? `Aktiv seit ${new Date(p.since).toLocaleDateString('de-DE')}` : 'Ohne Werbung, eigene App-Farbe';
+}
+function openPro() {
+  const pro = isPro(), p = proState() || {}, col = p.color || PRO_COLORS[0][0];
+  const row = (ic, g, b, t) => `<div class="it">${tile(ic, g)}<div class="n news-n"><b>${b}</b><span>${t}</span></div></div>`;
+  openLayer('sheet', `
+    <div class="sh"><div class="t"></div><button class="xb" data-act="close" aria-label="Schließen">${icon('x')}</button></div>
+    <div class="hello pro-hello">
+      <span class="pro-crown">${CROWN}</span>
+      <h2>Biss Pro${pro ? ' ist aktiv' : ''}</h2>
+      <p>${pro ? 'Danke! Du siehst keine Werbung mehr.' : `Einmal ${PRO_PRICE}, kein Abo.`}</p>
+    </div>
+    <section class="list icons bklist">
+      ${row('x', ['#ff6b8a', '#e3123f'], 'Keine Werbung', 'Weder Banner noch Vollbild-Anzeigen.')}
+      ${row('sparkle', ['#c77dff', '#9b4dde'], 'Eigene App-Farbe', 'Pink, Blau, Grün, Orange, Lila oder Türkis.')}
+      ${row('heart', ['#4ee37a', '#24b34b'], 'Entwickler unterstützen', 'Hilft, Biss weiter zu verbessern.')}
+    </section>
+    ${pro ? `<div class="hdr" style="padding:0 4px"><span>App-Farbe</span></div>
+    <div class="pro-colors">${PRO_COLORS.map(([c, n]) => `<button class="pro-col${c === col ? ' on' : ''}" data-c="${c}" style="--c:${c}" aria-label="${n}"></button>`).join('')}</div>
+    <button class="btn del" id="proOff" style="color:var(--l2)">Pro ausschalten (nur zum Testen)</button>` : `
+    <button class="btn pro-buy" id="proBuy">${CROWN}Pro holen · ${PRO_PRICE}</button>
+    <div class="pro-code"><input id="proCode" placeholder="Code einlösen" autocapitalize="characters" autocomplete="off" spellcheck="false"><button class="pillbtn" id="proCodeOk">Einlösen</button></div>`}
+    <p class="note">Test-Version: Es wird nichts bezahlt und keine echte Werbung geladen. Alle Anzeigen sind ausgedacht.</p>`, el => {
+    if (pro) {
+      el.querySelectorAll('.pro-col').forEach(b => b.addEventListener('click', () => {
+        lsSet(PRO_KEY, JSON.stringify({ ...proState(), color: b.dataset.c })); applyProColor(); buzz();
+        el.querySelectorAll('.pro-col').forEach(x => x.classList.toggle('on', x === b)); render();
+      }));
+      $('#proOff', el).addEventListener('click', () => { setPro(false); closeTop(); toast('Pro aus, Werbung ist wieder da'); });
+      return;
+    }
+    $('#proBuy', el).addEventListener('click', openDemoCheckout);
+    const ci = $('#proCode', el);
+    const redeem = async () => {
+      const v = ci.value.trim().toUpperCase().replace(/\s/g, ''); if (!v) return;
+      if (await sha256(v) === PRO_CODE_HASH) { closeAll(); setPro(true, 'code'); toast('Code eingelöst: Pro ist aktiv 👑'); confetti(); }
+      else { toast('Code stimmt nicht'); ci.select(); }
+    };
+    $('#proCodeOk', el).addEventListener('click', redeem);
+    ci.addEventListener('keydown', e => { if (e.key === 'Enter') redeem(); });
+  });
+}
+function openDemoCheckout() {
+  openLayer('sheet', `
+    <div class="sh"><div class="t"><b>Kauf bestätigen</b><span>Demo, es wird nichts abgebucht</span></div><button class="xb" data-act="close" aria-label="Schließen">${icon('x')}</button></div>
+    <section class="list">
+      <div class="it"><div class="n"><b>Biss Pro</b><span>Einmalkauf, kein Abo</span></div><span class="k num">${PRO_PRICE}</span></div>
+      <div class="it"><div class="n"><b>Bezahlen mit</b><span>Test-Zahlung</span></div><span class="k">Demo</span></div>
+    </section>
+    <button class="btn" id="coOk">Kaufen (Demo)</button>
+    <p class="note">Später im Play Store läuft das über Google Play. Hier ist es nur zum Ausprobieren.</p>`, el => {
+    $('#coOk', el).addEventListener('click', b => {
+      const btn = b.currentTarget; btn.disabled = true; btn.innerHTML = '<div class="spin" style="border-top-color:#fff"></div>';
+      setTimeout(() => { closeAll(); setPro(true, 'demo'); toast('Pro ist aktiv 👑'); confetti(); }, 900);
+    });
+  });
+}
+applyProColor();
+
 /* ---------- Update-Hinweis ---------- */
 // Wird jedem bestehenden Nutzer einmal gezeigt. Für die nächste Neuigkeit NEWS_ID ändern und Text anpassen.
-const NEWS_ID = 'makro-tipps-2026-11';
+const NEWS_ID = 'pro-demo-2026-11';
 function openNews() {
   S.seenNews = NEWS_ID; save();
   const row = (ic, g, b, t) => `<div class="it">${tile(ic, g)}<div class="n news-n"><b>${b}</b><span>${t}</span></div></div>`;
   openLayer('sheet', `
     <div class="hello">
       <img src="icons/icon-192.png" alt="" class="hello-ic">
-      <h2>Biss hat ein Update 🎉</h2>
-      <p>Neu: Tipps, wie du Kohlenhydrate, Eiweiß und Fett steigerst, bis dein Ziel erreicht ist.</p>
+      <h2>Neu in Biss 🎉</h2>
+      <p>Neu: Werbung und Biss Pro. Die Anzeigen sind nur Demos, es wird nichts bezahlt.</p>
     </div>
     <section class="list icons bklist">
-      ${row('target', ['#4ee37a', '#24b34b'], 'Auf Eiweiß, KH oder Fett tippen', 'Auf „Heute“ siehst du, wie viel noch fehlt.')}
-      ${row('fork', ['#ffb340', '#ff8a00'], 'Passende Lebensmittel', 'Mit der Menge, die du noch brauchst, und wie viel jedes davon bringt.')}
-      ${row('plus', ['#40a0ff', '#0a6fe0'], 'Mit einem Tipp eintragen', 'Die Menge ist schon vorgeschlagen.')}
+      ${row('info', ['#a1a1a6', '#6e6e73'], 'Demo-Werbung', 'Ausgedachte Anzeigen auf „Heute“, im Verlauf und alle 20 Minuten im Vollbild.')}
+      ${row('sparkle', ['#ffd60a', '#f5a300'], 'Biss Pro', 'Ohne Werbung und mit eigener App-Farbe. Unter „Ziele“ testweise freischalten.')}
     </section>
-    <button class="btn" id="nwGo">Ausprobieren</button>
+    <button class="btn" id="nwGo">Biss Pro ansehen</button>
     <button class="btn del" data-act="close" style="color:var(--l2)">Später</button>`, el => {
-    $('#nwGo', el).addEventListener('click', () => { closeTop(); const t = totals(cur), g = S.goals; const m = ['p', 'c', 'f'].find(k => g[k] - t[k] >= 1) || 'p'; setTimeout(() => openMacroTips(m), 330); });
+    $('#nwGo', el).addEventListener('click', () => { closeTop(); setTimeout(openPro, 330); });
   });
   confetti();
 }

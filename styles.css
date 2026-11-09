@@ -477,3 +477,39 @@ button.mc:active { transform: scale(.96); }
 .nx-err { min-height: 18px; margin: 12px 0 0; font-size: 13px; font-weight: 500; text-align: center; color: #ff8a8a; }
 .nx-card.shake { animation: mxShake .45s; }
 .nx-foot { margin: 26px 0 0; font-size: 12px; color: rgba(255,255,255,.6); text-shadow: 0 1px 8px rgba(0,0,0,.7); letter-spacing: .04em; }
+
+/* Demo-Werbung und Biss Pro */
+.ad { background: var(--g1); border-radius: 14px; padding: 8px 12px 10px; border: .5px dashed var(--l3); }
+.ad-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.ad-lbl { font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--l2); background: var(--g2); border-radius: 6px; padding: 2px 6px; }
+.ad-off { display: flex; align-items: center; gap: 3px; font-size: 12px; font-weight: 600; color: var(--tint); }
+.ad-off .i { font-size: 11px; }
+.ad-row { display: flex; align-items: center; gap: 12px; }
+.ad-row .n { flex: 1; min-width: 0; }
+.ad-row .n b { display: block; font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ad-row .n span { display: block; font-size: 13px; color: var(--l2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ad-ic { width: 42px; height: 42px; border-radius: 11px; font-size: 22px; }
+.ad-cta { flex: none; background: var(--blu); color: #fff; font-size: 13px; font-weight: 700; padding: 7px 12px; border-radius: 16px; }
+.adfull { position: fixed; inset: 0; z-index: 95; background: var(--bg); display: flex; flex-direction: column; padding: calc(env(safe-area-inset-top, 0px) + 12px) 18px calc(env(safe-area-inset-bottom, 0px) + 18px); opacity: 0; transition: opacity .25s; }
+.adfull.in { opacity: 1; }
+.adfull-top { display: flex; justify-content: space-between; align-items: center; }
+.adfull-x { width: 34px; height: 34px; border-radius: 50%; background: var(--g2); color: var(--l1); font-weight: 700; font-size: 15px; display: flex; align-items: center; justify-content: center; }
+.adfull-x[disabled] { color: var(--l2); }
+.adfull-x .i { font-size: 15px; }
+.adfull-body { flex: 1; margin: 14px 0; border-radius: 26px; background: linear-gradient(160deg, var(--a), var(--b)); color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 24px; gap: 6px; }
+.adfull-e { font-size: 92px; line-height: 1.1; filter: drop-shadow(0 8px 18px rgba(0,0,0,.2)); }
+.adfull-body h2 { margin: 8px 0 0; font-size: 30px; letter-spacing: -.02em; }
+.adfull-body p { margin: 0; font-size: 17px; opacity: .92; max-width: 280px; line-height: 1.4; }
+.adfull-cta { margin-top: 18px; background: #fff; color: #111; font-weight: 700; font-size: 17px; padding: 13px 26px; border-radius: 26px; }
+.adfull-pro { font-weight: 600; color: var(--tint); padding: 10px; font-size: 16px; }
+.pro-ic { background: linear-gradient(180deg, #ffd60a, #f5a300); }
+.pro-hello .pro-crown { width: 76px; height: 76px; border-radius: 20px; background: linear-gradient(160deg, #ffd60a, #f5a300); color: #fff; display: flex; align-items: center; justify-content: center; margin: 0 auto 6px; box-shadow: 0 8px 22px rgba(245,163,0,.35); }
+.pro-hello .pro-crown .i { font-size: 44px; }
+.pro-buy { display: flex; align-items: center; justify-content: center; gap: 8px; background: linear-gradient(180deg, #ffc93c, #f5a300); color: #3a2600; }
+.pro-buy .i { font-size: 20px; }
+.pro-code { display: flex; gap: 8px; align-items: center; background: var(--sheetcard); border-radius: 14px; padding: 6px 6px 6px 14px; }
+.pro-code input { flex: 1; min-width: 0; border: 0; background: transparent; font: inherit; font-size: 16px; color: var(--l1); letter-spacing: .04em; }
+.pro-colors { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+.pro-col { width: 40px; height: 40px; border-radius: 50%; background: var(--c); box-shadow: 0 0 0 2px var(--sheet), 0 0 0 2px var(--sheet); }
+.pro-col.on { box-shadow: 0 0 0 3px var(--sheet), 0 0 0 5px var(--c); }
+.pro-tag { display: inline-block; vertical-align: 2px; font-size: 11px; font-weight: 800; letter-spacing: .06em; color: #3a2600; background: linear-gradient(180deg, #ffd60a, #f5a300); border-radius: 6px; padding: 2px 6px; margin-left: 4px; }
