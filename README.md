@@ -1,6 +1,6 @@
 # Biss
 
-Aktuelle Version: 1.25.0
+Aktuelle Version: 1.26.0
 
 Kalorien- und Makro-Tracker fürs iPhone, ohne Abo, ohne Konto, ohne Werbung.
 Alle Daten bleiben lokal auf dem Gerät (localStorage). Lebensmittel kommen von
@@ -35,7 +35,7 @@ Icons: [Phosphor Icons](https://phosphoricons.com) (MIT). Barcode: [ZXing](https
 
 ## App sperren
 In `status.json` steuert `"gesperrt": true` einen Sperr-Bildschirm für alle Nutzer, `false` gibt die App wieder frei.
-Mit `"stil": "neon"` erscheint die schlichte Variante: nur Logo und `text`, am Rand ein wandernder RGB-Neonverlauf, im Hintergrund läuft ein Gym-Video (`media/gym.mp4`, Pexels-Lizenz, frei nutzbar). Admin-Login dort über 7× Tippen aufs Logo.
+Mit `"stil": "neon"` erscheint die schlichte Profi-Variante: graues Logo, `text` und eine Login-Maske (E-Mail und Passwort), dahinter ein Gym-Video in Schwarz-Weiß (`media/gym.mp4`, Pexels-Lizenz, frei nutzbar). Die E-Mail muss gültig sein, entscheidend ist das Admin-Passwort.
 Titel und Text lassen sich dort ebenfalls ändern. Die Daten auf den Geräten bleiben unberührt.
 Einen Zugangscode für Nutzer gibt es nicht. Der Entwickler kommt über „Ich bin Admin“ auf der Wartungs-Seite mit seinem Passwort rein (oder 7× auf „Biss · Wartung“ tippen). Das ist kein echter Schutz, da die App komplett im Browser läuft.
 Auf dem eigenen Gerät hebt 7× Tippen auf „Biss · Wartung“ im Sperr-Bildschirm die Sperre dauerhaft auf.
