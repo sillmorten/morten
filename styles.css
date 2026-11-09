@@ -446,3 +446,5 @@ button.mc:active { transform: scale(.96); }
 /* Rezept-Zutaten abwählbar */
 .list.ingr .it { gap: 12px; }
 .list.ingr .it.off .n b, .list.ingr .it.off .k { color: var(--l3); text-decoration: line-through; }
+.linkbtn { display: flex; align-items: center; gap: 8px; justify-content: center; border: 0; background: var(--sheetcard); color: var(--tint); font: inherit; font-size: 15px; font-weight: 600; border-radius: 14px; padding: 12px 14px; cursor: pointer; flex: none; }
+.linkbtn .i { font-size: 18px; }
